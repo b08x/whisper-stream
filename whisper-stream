@@ -21,6 +21,8 @@ AUDIO_FILE=""                  # Specific audio file for transcription
 PIPE_TO_CMD=""                 # Command to pipe the transcribed text to
 QUIET_MODE=false               # Flag to determine if the banner and settings should be suppressed
 GRANULARITIES="none"           # Timestamp granularities for transcription: segment or word
+NOTEBOOK_ROOT="$HOME/Notebooks"
+NOTEBOOK=""
 
 # Display help information for script usage
 function display_help() {
@@ -31,7 +33,7 @@ function display_help() {
   echo "  -o, --oneshot               Enable one-shot mode"
   echo "  -d, --duration <value>      Set the recording duration in seconds (default: 0, continuous)"
   echo "  -t, --token <value>         Set the OpenAI API token"
-  echo "  -p, --path <value>          Set the output directory path to create the transcription file"
+  echo "  -n, --notebook <value>          Set the Notebook to store dictations"
   echo "  -g, --granularities <value> Set the timestamp granularities (segment or word)"
   echo "  -r, --prompt <value>        Set the prompt for the API call"
   echo "  -l, --language <value>      Set the language in ISO-639-1 format"
@@ -135,32 +137,20 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
-    -p|--path)
+    -n|--notebook)
       if [[ ! $2 || $2 == -* ]]; then
         echo "Error: Missing value for $1"
         exit 1
       fi
-      OUTPUT_DIR="$2"
+      NOTEBOOK="$2"
       # check if the output directory exists
-      if [ ! -d "$OUTPUT_DIR" ]; then
-        echo "Directory does not exist: $OUTPUT_DIR"
+      if [ ! -d "$NOTEBOOK_ROOT/$NOTEBOOK" ]; then
+        echo "Directory does not exist: $NOTEBOOK_ROOT/$NOTEBOOK"
         exit 1
       fi
-      shift
-      shift
-      ;;
-    -e | --dictation)
-      # if [[ ! $2 || $2 == -* ]]; then
-      #   echo "Error: Missing value for $1"
-      #   exit 1
-      # fi
-
-      # Ensure the Notebooks directory exists
-      mkdir -p "$HOME/Notebooks"
-
+      OUTPUT_DIR="$NOTEBOOK_ROOT/$NOTEBOOK/Daily"
       timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
-      DEST_FILE="$HOME/Notebooks/dictation_$timestamp.md"
-
+      DEST_FILE="$OUTPUT_DIR/dictation_$timestamp.md"
       shift
       shift
       ;;
