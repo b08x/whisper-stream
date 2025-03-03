@@ -150,21 +150,20 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -e | --dictation)
-      if [[ ! $2 || $2 == -* ]]; then
-        echo "Error: Missing value for $1"
-        exit 1
-      fi
-      DEST_FILE="$2"
+      # if [[ ! $2 || $2 == -* ]]; then
+      #   echo "Error: Missing value for $1"
+      #   exit 1
+      # fi
 
-      # OUTPUT_DIR="$HOME/Workspace/Notebook/_transcriptions"
-      # check if the file exists
-      if [ ! -f "$DEST_FILE" ]; then
-        echo "File does not exist: $DEST_FILE"
-        exit 1
-      fi
+      # Ensure the Notebooks directory exists
+      mkdir -p "$HOME/Notebooks"
+
+      timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+      DEST_FILE="$HOME/Notebooks/dictation_$timestamp.md"
+
       shift
       shift
-      ;;      
+      ;;
     -g|--granularities)
       if [[ ! $2 || $2 == -* ]]; then
         echo "Error: Missing value for $1"
@@ -562,15 +561,6 @@ display_settings
 
 # Handle script termination using trap for SIGINT (Ctrl+C) and SIGTSTP (Ctrl+Z)
 trap handle_exit SIGINT SIGTSTP
-
-echo "Choose a notebook:"
-notebook=$(gum file --height=10 --directory "$HOME/Desktop" --file=false)
-if [ ! -d "$notebook" ]; then
-  echo "Error: Selected notebook directory does not exist."
-  exit 1
-fi
-dictations="${notebook}/_dictations"
-mkdir -p "$dictations"
 
 export AUDIODRIVER=alsa
 
