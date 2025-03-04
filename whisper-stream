@@ -21,7 +21,7 @@ AUDIO_FILE=""                  # Specific audio file for transcription
 PIPE_TO_CMD=""                 # Command to pipe the transcribed text to
 QUIET_MODE=false               # Flag to determine if the banner and settings should be suppressed
 GRANULARITIES="none"           # Timestamp granularities for transcription: segment or word
-NOTEBOOK_ROOT="$HOME/Notebooks"
+NOTEBOOK_ROOT=""
 NOTEBOOK=""
 
 # Display help information for script usage
@@ -33,6 +33,7 @@ function display_help() {
   echo "  -o, --oneshot               Enable one-shot mode"
   echo "  -d, --duration <value>      Set the recording duration in seconds (default: 0, continuous)"
   echo "  -t, --token <value>         Set the OpenAI API token"
+  echo "  -nr, --notebooks-root <value>          Set the Notebooks root directory"
   echo "  -n, --notebook <value>          Set the Notebook to store dictations"
   echo "  -g, --granularities <value> Set the timestamp granularities (segment or word)"
   echo "  -r, --prompt <value>        Set the prompt for the API call"
@@ -137,6 +138,15 @@ while [[ $# -gt 0 ]]; do
       shift
       shift
       ;;
+    -nr|--notebook-root)
+      if [[ ! $2 || $2 == -* ]]; then
+        echo "Error: Missing value for $1"
+        exit 1
+      fi
+      NOTEBOOK_ROOT="$2"
+      shift
+      shift
+      ;;      
     -n|--notebook)
       if [[ ! $2 || $2 == -* ]]; then
         echo "Error: Missing value for $1"
