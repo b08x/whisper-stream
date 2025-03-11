@@ -21,7 +21,7 @@ AUDIO_FILE=""                  # Specific audio file for transcription
 PIPE_TO_CMD=""                 # Command to pipe the transcribed text to
 QUIET_MODE=false               # Flag to determine if the banner and settings should be suppressed
 GRANULARITIES="none"           # Timestamp granularities for transcription: segment or word
-NOTEBOOK_ROOT=""
+NOTEBOOK_ROOT="${HOME}/Notebooks"
 NOTEBOOK=""
 
 # Display help information for script usage
@@ -159,9 +159,6 @@ while [[ $# -gt 0 ]]; do
         echo "Directory does not exist: $NOTEBOOK_ROOT/$NOTEBOOK"
         exit 1
       fi
-      OUTPUT_DIR="$NOTEBOOK_ROOT/$NOTEBOOK/Daily"
-      timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
-      DEST_FILE="$OUTPUT_DIR/dictation_$timestamp.md"
       shift
       shift
       ;;
@@ -227,7 +224,15 @@ while [[ $# -gt 0 ]]; do
       display_help
       ;;
     -df|--dest-file)
-      DEST_FILE="$(gum file)"
+      q=$(gum choose "start" "choose")
+      if [[ $q == "start" ]]; then
+        OUTPUT_DIR="$NOTEBOOK_ROOT/vault/Daily"
+        timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
+        DEST_FILE="$OUTPUT_DIR/dictation_$timestamp.md"
+      fi
+      if  [[ $q == "choose" ]]; then
+        DEST_FILE="$(gum file $NOTEBOOK_ROOT)"
+      fi
       shift
       shift
       ;;
