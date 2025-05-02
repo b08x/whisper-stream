@@ -1,5 +1,12 @@
 #!/bin/bash
 source ~/.env
+
+# Check if gum is installed
+if ! command -v gum &> /dev/null; then
+    echo "Error: gum is not installed. Please install it (https://github.com/charmbracelet/gum) to use this feature."
+    exit 1
+fi
+
 # Default configuration and versioning
 VERSION="1.1.0"
 
@@ -224,17 +231,57 @@ while [[ $# -gt 0 ]]; do
       display_help
       ;;
     -df|--dest-file)
-      q=$(gum choose "start" "choose")
-      if [[ $q == "start" ]]; then
-        OUTPUT_DIR="$NOTEBOOK_ROOT/vault/Daily"
-        timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
-        DEST_FILE="$OUTPUT_DIR/dictation_$timestamp.md"
+      if [[ ! $2 || $2 == -* ]]; then
+        echo "Error: Missing value for $1"
+        exit 1
       fi
-      if  [[ $q == "choose" ]]; then
-        DEST_FILE="$(gum file $NOTEBOOK_ROOT)"
+      DEST_FILE="$2"
+      # Ensure the directory exists if a full path is given
+      OUTPUT_DIR=$(dirname "$DEST_FILE")
+      if [ ! -d "$OUTPUT_DIR" ]; then
+         mkdir -p "$OUTPUT_DIR" || { echo "Error: Could not create directory $OUTPUT_DIR"; exit 1; }
       fi
-      shift
-      shift
+      shift # past argument
+# If no audio file is specified via -f, ask the user for input source and device
+if [ -z "$AUDIO_FILE" ]; then
+  INPUT_CHOICE=$(gum choose "Record from Microphone" "Transcribe from File" --header "Choose input source")
+
+  # Handle user cancellation
+  if [ -z "$INPUT_CHOICE" ]; then
+    echo "No input source selected. Exiting."
+    exit 0
+  fi
+
+  if [ "$INPUT_CHOICE" == "Transcribe from File" ]; then
+    # Use gum file to select an audio file
+    SELECTED_FILE=$(gum file --file --height 15 --header "Select an audio file")
+
+    # Handle user cancellation
+    if [ -z "$SELECTED_FILE" ]; then
+      echo "No file selected. Exiting."
+      exit 0
+    fi
+
+    # Use realpath to get the absolute path robustly
+    AUDIO_FILE=$(realpath "$SELECTED_FILE" 2>/dev/null) || { echo "Error resolving path: $SELECTED_FILE"; exit 1; }
+
+    # Validate the selected file
+    check_audio_file "$AUDIO_FILE"
+  elif [ "$INPUT_CHOICE" == "Record from Microphone" ]; then
+    # Select the input device
+    SELECTED_INPUT_DEVICE=$(select_input_device)
+    # select_input_device returns non-zero on error/cancel but might return "" for default
+    # We proceed even if it fails, falling back to the system default
+    if [ $? -ne 0 ] && [ -z "$SELECTED_INPUT_DEVICE" ]; then
+        echo "Proceeding with system default input device due to selection error or cancellation." >&2
+    elif [ -n "$SELECTED_INPUT_DEVICE" ] && [ "$SELECTED_INPUT_DEVICE" != "System Default" ]; then
+        echo "Selected input device: $SELECTED_INPUT_DEVICE" >&2
+    # else: System Default was chosen explicitly or implicitly
+    fi
+    # AUDIO_FILE remains empty, script proceeds to recording loop
+  fi
+fi
+      shift # past value
       ;;
     *)
       echo "Unknown option: $1"
@@ -252,6 +299,76 @@ fi
 # Fetch OpenAI API token from environment if not provided as an argument
 if [ -z "$TOKEN" ]; then
   TOKEN="${OPENAI_API_KEY:-}"
+# Function to list available audio input devices on macOS
+function list_macos_input_devices() {
+  if command -v SwitchAudioSource &> /dev/null; then
+    SwitchAudioSource -a -t input
+  else
+    # Fallback or error message if SwitchAudioSource is not found
+    echo "Error: SwitchAudioSource not found. Cannot list devices." >&2
+    return 1
+  fi
+}
+
+# Function to list available audio input devices on Linux (using pactl or arecord)
+function list_linux_input_devices() {
+  if command -v pactl &> /dev/null; then
+    # Get PulseAudio source names (often more user-friendly)
+    pactl list short sources | awk '{print $2}'
+  elif command -v arecord &> /dev/null; then
+     # Fallback to ALSA devices if pactl isn't available
+     arecord -l | grep '^card' | sed -e 's/card \([0-9]*\): \(.*\), device \([0-9]*\):.*/hw:\1,\3 \[\2]/' | awk -F ' [' '{print $1}'
+  else
+    echo "Error: pactl or arecord not found. Cannot list devices." >&2
+    return 1
+  fi
+}
+
+# Function to select an input device using gum
+function select_input_device() {
+  local os_type=$(uname)
+  local devices_list=()
+  local selected_device=""
+
+  echo "Detecting input devices..." # Add some feedback
+
+  if [[ "$os_type" == "Darwin" ]]; then
+    # Read devices into an array
+    mapfile -t devices_list < <(list_macos_input_devices)
+  elif [[ "$os_type" == "Linux" ]]; then
+    mapfile -t devices_list < <(list_linux_input_devices)
+  else
+    echo "Unsupported OS for device selection: $os_type" >&2
+    return 1 # Indicate failure
+  fi
+
+  if [ ${#devices_list[@]} -eq 0 ]; then
+    echo "No input devices found or could not list devices. Using system default." >&2
+    echo "" # Return empty string to signify default
+    return 1 # Indicate potential issue but allow fallback
+  fi
+
+  # Use gum choose to select a device
+  # Increase height based on number of devices, capped at ~20
+  local gum_height=${#devices_list[@]}
+  [ $gum_height -gt 20 ] && gum_height=20
+  # Add a "System Default" option
+  selected_device=$(printf "System Default\n%s\n" "${devices_list[@]}" | gum choose --header "Select Input Device" --height $((gum_height + 1)) )
+
+
+  # Handle cancellation or explicit "System Default" selection
+  if [ -z "$selected_device" ] || [ "$selected_device" == "System Default" ]; then
+      echo "Using system default input device." >&2
+      echo "" # Return empty string to signify default
+      return 0 # Not an error
+  fi
+
+  echo "$selected_device"
+  return 0 # Indicate success
+}
+
+# Variable to store the selected device ID/Name
+SELECTED_INPUT_DEVICE=""
 fi
 
 # If no token is provided as an argument or environment variable, exit the script
@@ -323,10 +440,17 @@ function display_settings() {
 		echo "  Destination File: $DEST_FILE"
 	fi
 
-  # Get the input device based on the operating system
-  local input_device=$(get_input_device)
-  if [ -n "$input_device" ]; then
-    echo "  Input device: $input_device"
+  # Display selected or default input device
+  if [ -n "$SELECTED_INPUT_DEVICE" ] && [ "$SELECTED_INPUT_DEVICE" != "System Default" ]; then
+      echo "  Selected Input Device: $SELECTED_INPUT_DEVICE"
+  else
+      # Try to get the system default device name for display purposes
+      local default_device_display=$(get_input_device) # Use existing function
+      if [ -n "$default_device_display" ]; then
+          echo "  Input device: $default_device_display (System Default)"
+      else
+          echo "  Input device: System Default"
+      fi
   fi
 
   # Get the input volume based on the operating system
@@ -573,8 +697,6 @@ display_settings
 # Handle script termination using trap for SIGINT (Ctrl+C) and SIGTSTP (Ctrl+Z)
 trap handle_exit SIGINT SIGTSTP
 
-export AUDIODRIVER=alsa
-
 # Main loop to continuously record audio, detect silence, and transcribe audio
 while true; do
   # Set the path to the output audio file
@@ -586,16 +708,40 @@ while true; do
   # Add a prompt at the beginning of the recording
   # echo -n $'\e[1;32m'▶ $'\e[0m'
 
-  # Record audio in raw format then convert to mp3
-  if [ "$DURATION" -gt 0 ]; then
-    rec -q -V0 -e signed -L -c 1 -b 16 -r 16000 -t raw \
-      - trim 0 "$DURATION" silence 1 0.1 "$MIN_VOLUME" 1 "$SILENCE_LENGTH" "$MIN_VOLUME" | \
-      sox -t raw -r 16000 -b 16 -e signed -c 1 - "$OUTPUT_FILE"
-  else
-    rec -q -V0 -e signed -L -c 1 -b 16 -r 16000 -t raw \
-      - silence 1 0.1 "$MIN_VOLUME" 1 "$SILENCE_LENGTH" "$MIN_VOLUME" | \
-      sox -t raw -r 16000 -b 16 -e signed -c 1 - "$OUTPUT_FILE"
+  # Construct rec command arguments
+  REC_ARGS=("-q" "-V0" "-e" "signed" "-L" "-c" "1" "-b" "16" "-r" "16000" "-t" "raw")
+
+  # Add device if selected and not default
+  if [ -n "$SELECTED_INPUT_DEVICE" ] && [ "$SELECTED_INPUT_DEVICE" != "System Default" ]; then
+      # Special handling for macOS if SwitchAudioSource was used
+      if [[ "$(uname)" == "Darwin" ]] && command -v SwitchAudioSource &> /dev/null; then
+          # Attempt to set the device using SwitchAudioSource
+          SwitchAudioSource -t input -s "$SELECTED_INPUT_DEVICE"
+          if [ $? -ne 0 ]; then
+              echo "Warning: Failed to set input device using SwitchAudioSource. Using system default." >&2
+          else
+              # No need to pass -d to rec as SwitchAudioSource changes the system default
+              : # Placeholder, action is done
+          fi
+      else
+          # For Linux or macOS without SwitchAudioSource, pass -d
+          # Ensure we pass the correct device format (e.g., hw:X,Y for ALSA)
+          # The list_linux_input_devices function already provides this format
+          REC_ARGS+=("-d" "$SELECTED_INPUT_DEVICE")
+      fi
   fi
+
+  REC_ARGS+=("-") # Output to stdout
+
+  # Add effects based on duration
+  if [ "$DURATION" -gt 0 ]; then
+    REC_ARGS+=("trim" "0" "$DURATION" "silence" "1" "0.1" "$MIN_VOLUME" "1" "$SILENCE_LENGTH" "$MIN_VOLUME")
+  else
+    REC_ARGS+=("silence" "1" "0.1" "$MIN_VOLUME" "1" "$SILENCE_LENGTH" "$MIN_VOLUME")
+  fi
+
+  # Record audio using constructed arguments
+  rec "${REC_ARGS[@]}" | sox -t raw -r 16000 -b 16 -e signed -c 1 - "$OUTPUT_FILE"
   
   # Check if the audio file is created successfully
   if [ -s "$OUTPUT_FILE" ]; then
