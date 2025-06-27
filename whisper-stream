@@ -1,6 +1,28 @@
 #!/bin/bash
 source ~/.env
 
+# Set up error logging
+ERROR_LOG="/tmp/whisper-stream-error.log"
+exec 2> >(tee -a "$ERROR_LOG" >&2)
+
+# Function to log errors with timestamp
+function log_error() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$ERROR_LOG"
+}
+
+# Function to rotate error log if it gets too large
+function rotate_error_log() {
+  if [[ -f "$ERROR_LOG" && $(stat -f%z "$ERROR_LOG" 2>/dev/null || stat -c%s "$ERROR_LOG" 2>/dev/null) -gt 1048576 ]]; then
+    # If log is larger than 1MB, keep only the last 500 lines
+    tail -n 500 "$ERROR_LOG" > "${ERROR_LOG}.tmp" && mv "${ERROR_LOG}.tmp" "$ERROR_LOG"
+    log_error "Log rotated - keeping last 500 lines"
+  fi
+}
+
+# Initialize error logging
+rotate_error_log
+log_error "whisper-stream started (PID: $$)"
+
 # Check if gum is installed
 if ! command -v gum &> /dev/null; then
     echo "Error: gum is not installed. Please install it (https://github.com/charmbracelet/gum) to use this feature."
@@ -540,6 +562,7 @@ function display_settings() {
   echo $'\e[1;34m'Whisper Stream Speech-to-Text Transcriber$'\e[0m' ${VERSION}
   echo $'\e[1;33m'-----------------------------------------------$'\e[0m'
   echo "Current settings:"
+  echo "  Error log: $ERROR_LOG"
   echo "  Volume threshold: $MIN_VOLUME"
   echo "  Silence length: $SILENCE_LENGTH seconds"
   echo "  Input language: ${LANGUAGE:-Not specified}"
@@ -711,6 +734,8 @@ function convert_audio_to_text() {
 
 # Handle the script termination: clean up and save transcriptions
 function handle_exit() {
+  log_error "whisper-stream exiting (PID: $$)"
+  
   # Wait for all background jobs to finish
   wait
 
