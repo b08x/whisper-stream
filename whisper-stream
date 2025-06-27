@@ -8,7 +8,7 @@ if ! command -v gum &> /dev/null; then
 fi
 
 # Default configuration and versioning
-VERSION="1.1.0"
+VERSION="1.2.0"
 
 # Setting the default values for the script parameters
 MIN_VOLUME=1%                  # Minimum volume threshold
@@ -46,6 +46,7 @@ function display_help() {
   echo "  -r, --prompt <value>        Set the prompt for the API call"
   echo "  -l, --language <value>      Set the language in ISO-639-1 format"
   echo "  -f, --file <value>          Set the audio file to be transcribed"
+  echo "  -i, --input-device <value>  Set the input device for recording"
   echo "  -tr, --translate            Translate the transcribed text to English"
   echo "  -p2, --pipe-to <cmd>        Pipe the transcribed text to the specified command (e.g., 'wc -m')"
   echo "  -df <file>, --dest-file <file>  Set the destination file for transcriptions"
@@ -98,6 +99,129 @@ function check_audio_file() {
       ;;
   esac
 }
+
+# Function to load configuration from config file
+function load_config() {
+  local config_file="$HOME/.config/whisper-stream/config"
+  
+  if [[ -f "$config_file" ]]; then
+    while IFS='=' read -r key value || [[ -n "$key" ]]; do
+      # Skip empty lines and comments
+      [[ "$key" =~ ^[[:space:]]*$ ]] && continue
+      [[ "$key" =~ ^[[:space:]]*# ]] && continue
+      
+      # Remove leading/trailing whitespace
+      key=$(echo "$key" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      
+      # Remove quotes if present
+      value=$(echo "$value" | sed 's/^"//;s/"$//')
+      
+      case "$key" in
+        MIN_VOLUME) MIN_VOLUME="$value" ;;
+        SILENCE_LENGTH) SILENCE_LENGTH="$value" ;;
+        ONESHOT) 
+          if [[ "$value" =~ ^(true|yes|1)$ ]]; then
+            ONESHOT=true
+          else
+            ONESHOT=false
+          fi
+          ;;
+        DURATION) DURATION="$value" ;;
+        TOKEN) TOKEN="$value" ;;
+        OUTPUT_DIR) OUTPUT_DIR="$value" ;;
+        DEST_FILE) DEST_FILE="$value" ;;
+        PROMPT) PROMPT="$value" ;;
+        LANGUAGE) LANGUAGE="$value" ;;
+        TRANSLATE)
+          if [[ "$value" =~ ^(true|yes|1)$ ]]; then
+            TRANSLATE="true"
+          else
+            TRANSLATE=""
+          fi
+          ;;
+        AUDIO_FILE) AUDIO_FILE="$value" ;;
+        PIPE_TO_CMD) PIPE_TO_CMD="$value" ;;
+        QUIET_MODE)
+          if [[ "$value" =~ ^(true|yes|1)$ ]]; then
+            QUIET_MODE=true
+          else
+            QUIET_MODE=false
+          fi
+          ;;
+        GRANULARITIES) GRANULARITIES="$value" ;;
+        NOTEBOOK_ROOT) NOTEBOOK_ROOT="$value" ;;
+        NOTEBOOK) NOTEBOOK="$value" ;;
+        SELECTED_INPUT_DEVICE) SELECTED_INPUT_DEVICE="$value" ;;
+      esac
+    done < "$config_file"
+  fi
+}
+
+# Function to write selected device back to config file
+function write_device_to_config() {
+  local device="$1"
+  local config_file="$HOME/.config/whisper-stream/config"
+  local config_dir="$HOME/.config/whisper-stream"
+  
+  # Create config directory if it doesn't exist
+  mkdir -p "$config_dir"
+  
+  # If config file doesn't exist, create it with default values first
+  if [[ ! -f "$config_file" ]]; then
+    cat > "$config_file" << 'EOF'
+# whisper-stream configuration file
+# This file is loaded when whisper-stream is called without arguments
+
+# Audio recording settings
+MIN_VOLUME=1%
+SILENCE_LENGTH=1.5
+ONESHOT=false
+DURATION=0
+
+# API settings
+# TOKEN=your_groq_api_key_here
+
+# Output settings
+OUTPUT_DIR=""
+DEST_FILE=""
+QUIET_MODE=false
+
+# Transcription settings
+PROMPT=""
+LANGUAGE=""
+TRANSLATE=false
+GRANULARITIES=none
+
+# Notebook settings
+NOTEBOOK_ROOT=${HOME}/Notebooks
+NOTEBOOK=""
+
+# Device settings
+SELECTED_INPUT_DEVICE=""
+
+# Advanced settings
+AUDIO_FILE=""
+PIPE_TO_CMD=""
+EOF
+  fi
+  
+  # Update the SELECTED_INPUT_DEVICE line in the config file
+  if grep -q "^SELECTED_INPUT_DEVICE=" "$config_file"; then
+    # Replace existing line
+    sed -i "s/^SELECTED_INPUT_DEVICE=.*/SELECTED_INPUT_DEVICE=\"$device\"/" "$config_file"
+  else
+    # Add new line if it doesn't exist
+    echo "SELECTED_INPUT_DEVICE=\"$device\"" >> "$config_file"
+  fi
+  
+  echo "Saved device selection to config: $device" >&2
+}
+
+# Load config file if no arguments provided
+if [[ $# -eq 0 ]]; then
+  load_config
+fi
 
 # Parse command-line arguments to set script parameters
 while [[ $# -gt 0 ]]; do
@@ -227,6 +351,15 @@ while [[ $# -gt 0 ]]; do
       QUIET_MODE=true
       shift
       ;;
+    -i|--input-device)
+      if [[ ! $2 || $2 == -* ]]; then
+        echo "Error: Missing value for $1"
+        exit 1
+      fi
+      SELECTED_INPUT_DEVICE="$2"
+      shift
+      shift
+      ;;
     -h|--help)
       display_help
       ;;
@@ -242,45 +375,6 @@ while [[ $# -gt 0 ]]; do
          mkdir -p "$OUTPUT_DIR" || { echo "Error: Could not create directory $OUTPUT_DIR"; exit 1; }
       fi
       shift # past argument
-# If no audio file is specified via -f, ask the user for input source and device
-if [ -z "$AUDIO_FILE" ]; then
-  INPUT_CHOICE=$(gum choose "Record from Microphone" "Transcribe from File" --header "Choose input source")
-
-  # Handle user cancellation
-  if [ -z "$INPUT_CHOICE" ]; then
-    echo "No input source selected. Exiting."
-    exit 0
-  fi
-
-  if [ "$INPUT_CHOICE" == "Transcribe from File" ]; then
-    # Use gum file to select an audio file
-    SELECTED_FILE=$(gum file --file --height 15 --header "Select an audio file")
-
-    # Handle user cancellation
-    if [ -z "$SELECTED_FILE" ]; then
-      echo "No file selected. Exiting."
-      exit 0
-    fi
-
-    # Use realpath to get the absolute path robustly
-    AUDIO_FILE=$(realpath "$SELECTED_FILE" 2>/dev/null) || { echo "Error resolving path: $SELECTED_FILE"; exit 1; }
-
-    # Validate the selected file
-    check_audio_file "$AUDIO_FILE"
-  elif [ "$INPUT_CHOICE" == "Record from Microphone" ]; then
-    # Select the input device
-    SELECTED_INPUT_DEVICE=$(select_input_device)
-    # select_input_device returns non-zero on error/cancel but might return "" for default
-    # We proceed even if it fails, falling back to the system default
-    if [ $? -ne 0 ] && [ -z "$SELECTED_INPUT_DEVICE" ]; then
-        echo "Proceeding with system default input device due to selection error or cancellation." >&2
-    elif [ -n "$SELECTED_INPUT_DEVICE" ] && [ "$SELECTED_INPUT_DEVICE" != "System Default" ]; then
-        echo "Selected input device: $SELECTED_INPUT_DEVICE" >&2
-    # else: System Default was chosen explicitly or implicitly
-    fi
-    # AUDIO_FILE remains empty, script proceeds to recording loop
-  fi
-fi
       shift # past value
       ;;
     *)
@@ -290,91 +384,113 @@ fi
   esac
 done
 
+
 # Display version if the version flag is set
 if [ "$SHOW_VERSION" = true ]; then
   echo "Whisper Stream Speech-to-Text Transcriber (version: $VERSION)"
   exit
 fi
 
-# Fetch OpenAI API token from environment if not provided as an argument
-if [ -z "$TOKEN" ]; then
-  TOKEN="${OPENAI_API_KEY:-}"
-# Function to list available audio input devices on macOS
-function list_macos_input_devices() {
-  if command -v SwitchAudioSource &> /dev/null; then
-    SwitchAudioSource -a -t input
-  else
-    # Fallback or error message if SwitchAudioSource is not found
-    echo "Error: SwitchAudioSource not found. Cannot list devices." >&2
-    return 1
-  fi
-}
-
-# Function to list available audio input devices on Linux (using pactl or arecord)
-function list_linux_input_devices() {
+# Function to list available audio input devices on Linux
+function list_input_devices() {
   if command -v pactl &> /dev/null; then
-    # Get PulseAudio source names (often more user-friendly)
-    pactl list short sources | awk '{print $2}'
+    # Use PulseAudio device names (more compatible with SoX)
+    pactl list short sources | while read -r index name module format state; do
+      # Skip monitor devices
+      if [[ "$name" != *.monitor ]]; then
+        # Get a friendly description
+        local desc=$(pactl list sources | grep -A 10 "Name: $name" | grep "Description:" | sed 's/.*Description: //')
+        echo "$name [$desc]"
+      fi
+    done
   elif command -v arecord &> /dev/null; then
-     # Fallback to ALSA devices if pactl isn't available
-     arecord -l | grep '^card' | sed -e 's/card \([0-9]*\): \(.*\), device \([0-9]*\):.*/hw:\1,\3 \[\2]/' | awk -F ' [' '{print $1}'
+    # Fallback to ALSA hardware devices
+    arecord -l | grep '^card' | while read -r line; do
+      card=$(echo "$line" | sed -n 's/card \([0-9]*\):.*/\1/p')
+      device=$(echo "$line" | sed -n 's/.*device \([0-9]*\):.*/\1/p')
+      name=$(echo "$line" | sed -n 's/.*: \([^[]*\) \[.*/\1/p')
+      echo "hw:$card,$device [$name]"
+    done
   else
-    echo "Error: pactl or arecord not found. Cannot list devices." >&2
+    echo "Error: Neither pactl nor arecord found. Cannot list devices." >&2
     return 1
   fi
 }
 
 # Function to select an input device using gum
 function select_input_device() {
-  local os_type=$(uname)
   local devices_list=()
-  local selected_device=""
-
-  echo "Detecting input devices..." # Add some feedback
-
-  if [[ "$os_type" == "Darwin" ]]; then
-    # Read devices into an array
-    mapfile -t devices_list < <(list_macos_input_devices)
-  elif [[ "$os_type" == "Linux" ]]; then
-    mapfile -t devices_list < <(list_linux_input_devices)
-  else
-    echo "Unsupported OS for device selection: $os_type" >&2
-    return 1 # Indicate failure
-  fi
-
+  
+  echo "Detecting input devices..." >&2
+  
+  # Read devices into an array
+  mapfile -t devices_list < <(list_input_devices)
+  
   if [ ${#devices_list[@]} -eq 0 ]; then
-    echo "No input devices found or could not list devices. Using system default." >&2
-    echo "" # Return empty string to signify default
-    return 1 # Indicate potential issue but allow fallback
+    echo "No input devices found. Using system default." >&2
+    echo ""
+    return 1
   fi
-
+  
   # Use gum choose to select a device
-  # Increase height based on number of devices, capped at ~20
-  local gum_height=${#devices_list[@]}
-  [ $gum_height -gt 20 ] && gum_height=20
-  # Add a "System Default" option
-  selected_device=$(printf "System Default\n%s\n" "${devices_list[@]}" | gum choose --header "Select Input Device" --height $((gum_height + 1)) )
-
-
-  # Handle cancellation or explicit "System Default" selection
+  local selected_device
+  selected_device=$(printf "System Default\n%s\n" "${devices_list[@]}" | gum choose --header "Select Input Device")
+  
+  # Handle cancellation or "System Default" selection
   if [ -z "$selected_device" ] || [ "$selected_device" == "System Default" ]; then
-      echo "Using system default input device." >&2
-      echo "" # Return empty string to signify default
-      return 0 # Not an error
+    echo "Using system default input device." >&2
+    echo ""
+    return 0
   fi
-
-  echo "$selected_device"
-  return 0 # Indicate success
+  
+  # Extract device name from the selection (remove description)
+  local device_id=$(echo "$selected_device" | sed 's/\([^ ]*\) \[.*/\1/')
+  echo "$device_id"
+  return 0
 }
 
-# Variable to store the selected device ID/Name
-SELECTED_INPUT_DEVICE=""
+# Function to generate default destination file path
+function generate_default_dest_file() {
+  local current_date=$(date +%Y-%m-%d)
+  local current_month_year=$(date +%Y-%B)
+  # Expand HOME variable properly
+  local expanded_notebook_root="${NOTEBOOK_ROOT/#\$HOME/$HOME}"
+  local dest_dir="$expanded_notebook_root/$current_month_year"
+  local dest_file="$dest_dir/$current_date.md"
+  
+  # Create directory if it doesn't exist
+  mkdir -p "$dest_dir"
+  
+  echo "$dest_file"
+}
+
+# Fetch OpenAI API token from environment if not provided as an argument
+if [ -z "$TOKEN" ]; then
+  TOKEN="${OPENAI_API_KEY:-}"
 fi
 
 # If no token is provided as an argument or environment variable, exit the script
 if [ -z "$TOKEN" ]; then
   echo "No OpenAI API key provided. Please provide it as an argument or environment variable."
   exit 1
+fi
+
+# Check if we need to prompt for input device (only if not transcribing a file)
+if [ -z "$AUDIO_FILE" ] && [ -z "$SELECTED_INPUT_DEVICE" ]; then
+  echo "No input device specified. Please select an input device:"
+  SELECTED_INPUT_DEVICE=$(select_input_device)
+  
+  # Save the selected device to config if a specific device was chosen
+  if [ -n "$SELECTED_INPUT_DEVICE" ] && [ "$SELECTED_INPUT_DEVICE" != "" ]; then
+    echo "Selected input device: $SELECTED_INPUT_DEVICE"
+    write_device_to_config "$SELECTED_INPUT_DEVICE"
+  fi
+fi
+
+# Set default destination file if none specified (only for recording, not file transcription)
+if [ -z "$AUDIO_FILE" ] && [ -z "$DEST_FILE" ]; then
+  DEST_FILE=$(generate_default_dest_file)
+  echo "Using default destination file: $DEST_FILE"
 fi
 
 output_files=() # Array to store the names of output audio files
@@ -709,26 +825,12 @@ while true; do
   # echo -n $'\e[1;32m'▶ $'\e[0m'
 
   # Construct rec command arguments
-  REC_ARGS=("-q" "-V0" "-e" "signed" "-L" "-c" "1" "-b" "16" "-r" "16000" "-t" "raw")
-
-  # Add device if selected and not default
   if [ -n "$SELECTED_INPUT_DEVICE" ] && [ "$SELECTED_INPUT_DEVICE" != "System Default" ]; then
-      # Special handling for macOS if SwitchAudioSource was used
-      if [[ "$(uname)" == "Darwin" ]] && command -v SwitchAudioSource &> /dev/null; then
-          # Attempt to set the device using SwitchAudioSource
-          SwitchAudioSource -t input -s "$SELECTED_INPUT_DEVICE"
-          if [ $? -ne 0 ]; then
-              echo "Warning: Failed to set input device using SwitchAudioSource. Using system default." >&2
-          else
-              # No need to pass -d to rec as SwitchAudioSource changes the system default
-              : # Placeholder, action is done
-          fi
-      else
-          # For Linux or macOS without SwitchAudioSource, pass -d
-          # Ensure we pass the correct device format (e.g., hw:X,Y for ALSA)
-          # The list_linux_input_devices function already provides this format
-          REC_ARGS+=("-d" "$SELECTED_INPUT_DEVICE")
-      fi
+      # Use PulseAudio input with specific device
+      REC_ARGS=("-t" "pulseaudio" "-D" "$SELECTED_INPUT_DEVICE" "-q" "-V0" "-e" "signed" "-L" "-c" "1" "-b" "16" "-r" "16000" "-t" "raw")
+  else
+      # Use default input
+      REC_ARGS=("-q" "-V0" "-e" "signed" "-L" "-c" "1" "-b" "16" "-r" "16000" "-t" "raw")
   fi
 
   REC_ARGS+=("-") # Output to stdout
