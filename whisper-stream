@@ -240,6 +240,66 @@ EOF
   echo "Saved device selection to config: $device" >&2
 }
 
+# Function to write notebook root back to config file
+function write_notebook_root_to_config() {
+  local notebook_root="$1"
+  local config_file="$HOME/.config/whisper-stream/config"
+  local config_dir="$HOME/.config/whisper-stream"
+  
+  # Create config directory if it doesn't exist
+  mkdir -p "$config_dir"
+  
+  # If config file doesn't exist, create it with default values first
+  if [[ ! -f "$config_file" ]]; then
+    cat > "$config_file" << 'EOF'
+# whisper-stream configuration file
+# This file is loaded when whisper-stream is called without arguments
+
+# Audio recording settings
+MIN_VOLUME=1%
+SILENCE_LENGTH=1.5
+ONESHOT=false
+DURATION=0
+
+# API settings
+# TOKEN=your_groq_api_key_here
+
+# Output settings
+OUTPUT_DIR=""
+DEST_FILE=""
+QUIET_MODE=false
+
+# Transcription settings
+PROMPT=""
+LANGUAGE=""
+TRANSLATE=false
+GRANULARITIES=none
+
+# Notebook settings
+NOTEBOOK_ROOT=${HOME}/Notebooks
+NOTEBOOK=""
+
+# Device settings
+SELECTED_INPUT_DEVICE=""
+
+# Advanced settings
+AUDIO_FILE=""
+PIPE_TO_CMD=""
+EOF
+  fi
+  
+  # Update the NOTEBOOK_ROOT line in the config file
+  if grep -q "^NOTEBOOK_ROOT=" "$config_file"; then
+    # Replace existing line
+    sed -i "s|^NOTEBOOK_ROOT=.*|NOTEBOOK_ROOT=\"$notebook_root\"|" "$config_file"
+  else
+    # Add new line if it doesn't exist
+    echo "NOTEBOOK_ROOT=\"$notebook_root\"" >> "$config_file"
+  fi
+  
+  echo "Saved notebook root to config: $notebook_root" >&2
+}
+
 # Load config file if no arguments provided
 if [[ $# -eq 0 ]]; then
   load_config
@@ -509,10 +569,46 @@ if [ -z "$AUDIO_FILE" ] && [ -z "$SELECTED_INPUT_DEVICE" ]; then
   fi
 fi
 
-# Set default destination file if none specified (only for recording, not file transcription)
+# Check for notebook root directory selection if not specified or doesn't exist
+if [ -z "$NOTEBOOK_ROOT" ] || [ ! -d "${NOTEBOOK_ROOT/#\$HOME/$HOME}" ]; then
+  echo "Notebook root directory not specified or doesn't exist. Please select a directory:"
+  SELECTED_DIR=$(gum file --directory --header "Select Notebook Root Directory" "$HOME")
+  
+  if [ -n "$SELECTED_DIR" ]; then
+    NOTEBOOK_ROOT="$SELECTED_DIR"
+    echo "Selected notebook root: $NOTEBOOK_ROOT"
+    # Update config file with selected directory
+    write_notebook_root_to_config "$NOTEBOOK_ROOT"
+  else
+    echo "No directory selected. Using default: $HOME/Notebooks"
+    NOTEBOOK_ROOT="$HOME/Notebooks"
+    mkdir -p "$NOTEBOOK_ROOT"
+  fi
+fi
+
+# Set destination file if none specified (only for recording, not file transcription)
 if [ -z "$AUDIO_FILE" ] && [ -z "$DEST_FILE" ]; then
-  DEST_FILE=$(generate_default_dest_file)
-  echo "Using default destination file: $DEST_FILE"
+  # Ask user to choose between auto-generated daily file or custom file selection
+  DEST_CHOICE=$(gum choose "Auto-generate daily file" "Select custom file" --header "Choose destination file option")
+  
+  if [ "$DEST_CHOICE" == "Select custom file" ]; then
+    # Let user select or create a custom destination file
+    echo "Select destination file (or navigate to create a new one):"
+    CUSTOM_DEST=$(gum file --file --header "Select Destination File" "${NOTEBOOK_ROOT/#\$HOME/$HOME}")
+    
+    if [ -n "$CUSTOM_DEST" ]; then
+      DEST_FILE="$CUSTOM_DEST"
+      echo "Selected destination file: $DEST_FILE"
+    else
+      # Fallback to auto-generated if user cancels
+      DEST_FILE=$(generate_default_dest_file)
+      echo "No file selected. Using auto-generated: $DEST_FILE"
+    fi
+  else
+    # Auto-generate daily file (default behavior)
+    DEST_FILE=$(generate_default_dest_file)
+    echo "Using auto-generated daily file: $DEST_FILE"
+  fi
 fi
 
 output_files=() # Array to store the names of output audio files
