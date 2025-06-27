@@ -706,7 +706,7 @@ function convert_audio_to_text() {
   
   # Accumulate the transcribed text in a temporary file
   # this is necessary for the data to be available when the script terminates
-  echo "$transcription" >> temp_transcriptions.txt
+  echo "$transcription" >> "/tmp/whisper-stream_temp_transcriptions.txt"
 }
 
 # Handle the script termination: clean up and save transcriptions
@@ -723,11 +723,11 @@ function handle_exit() {
   done
 
   # if temp_transcriptions.txt exists, remove it
-  if [ -f temp_transcriptions.txt ]; then
+  if [ -f "/tmp/whisper-stream_temp_transcriptions.txt" ]; then
     # read data from temp_transcriptions.txt into the accumulated_text variable
     # and remove temp_transcriptions.txt
-    accumulated_text=$(cat temp_transcriptions.txt)
-    rm -f temp_transcriptions.txt
+    accumulated_text=$(cat "/tmp/whisper-stream_temp_transcriptions.txt")
+    rm -f "/tmp/whisper-stream_temp_transcriptions.txt"
     # Clear the current line
     printf "\r\e[K\n"
   else
@@ -815,8 +815,8 @@ trap handle_exit SIGINT SIGTSTP
 
 # Main loop to continuously record audio, detect silence, and transcribe audio
 while true; do
-  # Set the path to the output audio file
-  OUTPUT_FILE="output_$(date +%s).wav"
+  # Set the path to the output audio file in temp directory
+  OUTPUT_FILE="/tmp/whisper-stream_output_$(date +%s).wav"
   
   # Add the output file to the array
   output_files+=("$OUTPUT_FILE")
