@@ -58,7 +58,7 @@ output_files=() # Array to store the names of output audio files
 function handle_exit() {
     log_error "whisper-stream exiting (PID: $$)"
 
-    # Wait for any currently running background jobs (like a transcription) to finish
+    # Wait for any currently running background jobs to finish
     wait
 
     # Kill any remaining child processes (like sox/rec if they are stuck)
@@ -69,57 +69,11 @@ function handle_exit() {
         rm -f "$file"
     done
 
-    local accumulated_text=""
-    # Check if the temporary transcriptions file exists and has content
-    if [ -s "/tmp/whisper-stream_temp_transcriptions.txt" ]; then
-        accumulated_text=$(cat "/tmp/whisper-stream_temp_transcriptions.txt")
-        rm -f "/tmp/whisper-stream_temp_transcriptions.txt"
-    fi
-
-    # Clear the last line of output (the spinner)
     printf "\r\e[K\n"
 
-    # Exit now if there's no text to save.
-    if [ -z "$accumulated_text" ]; then
-        gum_warn "No transcription text was generated to save."
-        exit 0
-    fi
-
-    # --- Proceed with saving and copying only if there is text ---
-
-    # If output directory is specified, create a file with the accumulated text
-    if [ -n "$OUTPUT_DIR" ]; then
-        timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
-        local ext="txt"
-        if [ "$GRANULARITIES" != "none" ]; then
-            ext="json"
-        fi
-        echo "$accumulated_text" >"$OUTPUT_DIR/transcription_$timestamp.$ext"
-        gum_info "Saved transcription to timestamped file in $OUTPUT_DIR"
-    fi
-
-    # If a destination file is specified, append the accumulated text to it
     if [ -n "$DEST_FILE" ]; then
-        echo "$accumulated_text" >>"$DEST_FILE"
-        gum_info "Appended transcription to $DEST_FILE"
+        gum_info "Exiting. Transcription saved to $DEST_FILE"
     fi
-
-    # Copy the accumulated text to the clipboard
-    case "$(uname -s)" in
-    Darwin)
-        echo "$accumulated_text" | pbcopy
-        ;;
-    Linux)
-        echo "$accumulated_text" | xclip -selection clipboard >&1
-        ;;
-    CYGWIN* | MINGW32* | MSYS* | MINGW*)
-        echo "$accumulated_text" | clip.exe >&1
-        ;;
-    *)
-        echo "Unknown OS, cannot copy to clipboard"
-        ;;
-    esac
-    gum_green "Transcription copied to clipboard."
 
     exit 0
 }
@@ -183,6 +137,8 @@ if [ -n "$AUDIO_FILE" ]; then
     display_settings # Display settings for file mode
     gum_info "Please wait..."
     convert_audio_to_text "$AUDIO_FILE"
+    # Since file mode is a one-shot operation, we need to call handle_exit to save properly if needed
+    # The new `handle_exit` is safe for this as it no longer contains batch-saving logic.
     handle_exit
 fi
 
@@ -229,9 +185,11 @@ while true; do
     fi
 
     if [ "$ONESHOT" = true ]; then
+        # In one-shot mode, wait for the last transcription to finish, then exit.
+        wait
         break
     fi
 done
 
-# Handle final cleanup and exit
+# Final cleanup for one-shot mode or if the loop breaks for other reasons
 handle_exit

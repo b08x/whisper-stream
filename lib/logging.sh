@@ -2,10 +2,16 @@
 
 # Set up error logging
 ERROR_LOG="/tmp/whisper-stream-error.log"
-exec 2> >(tee -a "$ERROR_LOG" >&2)
+
+# The following global redirection is disabled as it prevents 'gum' from
+# detecting terminal color support. Error logging is now handled manually
+# within the log_error function.
+#
+# exec 2> >(tee -a "$ERROR_LOG" >&2)
 
 # Function to log errors with timestamp
 function log_error() {
+    # Manually append the message to the log file.
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >>"$ERROR_LOG"
 }
 

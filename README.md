@@ -2,7 +2,9 @@
 
 ![whisper-stream](https://github.com/yohasebe/whisper-stream/assets/18207/7b419ba0-a621-40ac-82c6-9c498e038e0d)
 
-This is a **bash script** that utilizes the [Groq Whisper API](https://groq.com/) to **transcribe continuous voice input into text**. It uses SoX for audio recording and includes a built-in feature that detects silence between speech segments.
+This is a **modular bash script application** that utilizes the [Groq Whisper API](https://groq.com/) to **transcribe continuous voice input into text**. It uses SoX for audio recording and includes a built-in feature that detects silence between speech segments.
+
+The application is built with a **clean, modular architecture** featuring seven specialized modules that handle different aspects of the transcription process - from audio processing and UI interaction to configuration management and API integration.
 
 The script is designed to convert voice audio into text each time the system identifies a **specified duration of silence**. This enables the Whisper API to function as if it were capable of real-time speech-to-text conversion. It is also possible to specify the audio file to be converted by Whisper.
 
@@ -10,10 +12,14 @@ After transcription, the text is automatically copied to your system's **clipboa
 
 ## Features
 
+- **Modular Architecture**: Clean separation of concerns across 7 specialized modules
+- **Self-Installing UI**: Automatically downloads and installs the `gum` interactive framework
 - **Config file support**: Automatically loads settings from `~/.config/whisper-stream/config`
 - **Device selection**: Interactive audio input device selection with PulseAudio support
 - **Auto-destination**: Automatically creates daily transcription files in `$NOTEBOOK_ROOT/YYYY-Month/YYYY-MM-DD.md` format
-- **Linux optimized**: Streamlined for Linux workstations with PulseAudio
+- **Cross-platform**: Support for both Linux and macOS with intelligent device detection
+- **Error resilience**: Comprehensive error handling with retry logic and automatic cleanup
+- **Configuration persistence**: Saves device selections and preferences between sessions
 
 ## Installation
 
@@ -35,8 +41,11 @@ That's it! The `whisper-stream` command should now be available in your terminal
 - `curl`
 - `jq`
 - `sox`
-- `xclip` (for Linux)
-- `alsa-utils` (optional for Linux)
+- `xclip` (for Linux) or `pbcopy` (for macOS)
+- `pactl` or `arecord` (for Linux audio device detection)
+- `SwitchAudioSource` (optional for macOS)
+
+**Note**: The `gum` interactive UI framework will be automatically downloaded and installed if not found.
 
 On a Debian-based Linux distribution, you can install these dependencies with:
 
@@ -50,17 +59,21 @@ sudo apt-get install curl jq sox xclip alsa-utils
 > echo $PATH
 ```
 
-3. Move the `whisper-stream` script to the chosen directory. For example, if you want to move it to `/usr/local/bin`, run the following command:
+3. Clone or download the repository and move the entire `whisper-stream` directory to your chosen location:
 
 ```bash
-> mv whisper-stream /usr/local/bin
+> git clone <repository-url> whisper-stream
+> cd whisper-stream
+> chmod +x whisper-stream
 ```
 
-4. Make sure the script is executable by running the following command:
+4. Create a symlink to the script in your PATH directory:
 
 ```bash
-> chmod +x /usr/local/bin/whisper-stream
+> ln -s $(pwd)/whisper-stream /usr/local/bin/whisper-stream
 ```
+
+**Important**: The script requires the `lib/` directory to be in the same location as the main executable, as it sources the modular components from there.
 
 ## Usage
 
@@ -173,6 +186,28 @@ PIPE_TO_CMD=""
 ```
 
 Settings in this file are automatically loaded when running `whisper-stream` without arguments. Command-line arguments override config file settings.
+
+## Architecture
+
+The application features a modular architecture with the following components:
+
+### Core Modules (`lib/` directory)
+- **logging.sh**: Error logging and automatic log rotation
+- **gum_wrapper.sh**: Interactive UI framework with auto-installation
+- **config.sh**: Configuration management with persistent storage
+- **arguments.sh**: Command-line argument parsing and validation
+- **audio.sh**: Cross-platform audio processing and device management
+- **transcription.sh**: API integration with retry logic and text processing
+- **ui.sh**: User interface display and formatted output
+
+### Key Design Patterns
+- **Separation of Concerns**: Each module has a single, well-defined responsibility
+- **Cross-Platform Compatibility**: OS-specific implementations for macOS and Linux
+- **Progressive Enhancement**: Graceful handling of optional dependencies
+- **Configuration-First**: Config file loaded before argument parsing
+- **Error Resilience**: Comprehensive error handling with retries and cleanup
+
+The main `whisper-stream` script acts as an orchestrator, sourcing all modules and coordinating the transcription workflow.
 
 ## Author
 
