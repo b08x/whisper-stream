@@ -4,7 +4,7 @@
 
 This is a **modular bash script application** that utilizes the [Groq Whisper API](https://groq.com/) to **transcribe continuous voice input into text**. It uses SoX for audio recording and includes a built-in feature that detects silence between speech segments.
 
-The application is built with a **clean, modular architecture** featuring seven specialized modules that handle different aspects of the transcription process - from audio processing and UI interaction to configuration management and API integration.
+The application was re-designed using a modular architecture featuring seven specialized modules that handle different aspects of the transcription process - from audio processing and UI interaction to configuration management and API integration.
 
 The script is designed to convert voice audio into text each time the system identifies a **specified duration of silence**. This enables the Whisper API to function as if it were capable of real-time speech-to-text conversion. It is also possible to specify the audio file to be converted by Whisper.
 
@@ -20,19 +20,39 @@ After transcription, the text is automatically copied to your system's **clipboa
 - **Cross-platform**: Support for both Linux and macOS with intelligent device detection
 - **Error resilience**: Comprehensive error handling with retry logic and automatic cleanup
 - **Configuration persistence**: Saves device selections and preferences between sessions
+- **First-time setup**: Interactive setup wizard for new users
+- **Multiple installation methods**: AUR package, automated script, or manual installation
+- **Packaging support**: Ready-to-use PKGBUILD for Arch Linux distribution
 
 ## Installation
 
-### Homebrew (Recommended)
+### Arch Linux (AUR)
 
-Run the following commands:
+For Arch Linux users, the package is available in the AUR:
 
+```bash
+# Using yay
+yay -S whisper-stream
+
+# Using makepkg
+git clone https://aur.archlinux.org/whisper-stream.git
+cd whisper-stream
+makepkg -si
 ```
-> brew tap yohasebe/whisper-stream
-> brew install whisper-stream
+
+### Automated Installation Script
+
+The easiest way to install whisper-stream is using the automated installation script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/b08x/whisper-stream/main/scripts/install.sh | bash
 ```
 
-That's it! The `whisper-stream` command should now be available in your terminal.
+This script will:
+- Check for required dependencies and install them if needed
+- Install whisper-stream to `/usr/local/bin`
+- Set up configuration directories
+- Create example configuration files
 
 ### Manual Installation
 
@@ -75,6 +95,25 @@ sudo apt-get install curl jq sox xclip alsa-utils
 
 **Important**: The script requires the `lib/` directory to be in the same location as the main executable, as it sources the modular components from there.
 
+### Development Installation
+
+For development work, you can also install from source:
+
+```bash
+git clone https://github.com/b08x/whisper-stream.git
+cd whisper-stream
+chmod +x whisper-stream
+./whisper-stream  # Run directly from the source directory
+```
+
+### Packaging
+
+The repository includes packaging files for distribution:
+
+- **AUR Package**: `packaging/PKGBUILD` - Arch Linux package build script
+- **Installation Script**: `scripts/install.sh` - Automated installation for Linux systems
+- **Setup Scripts**: `scripts/first_time_setup.sh` - First-time user setup wizard
+
 ## Usage
 
 You can start the script with the following command:
@@ -111,6 +150,7 @@ Here are some usage examples with a brief comment on each of them:
 `> whisper-stream`
 
 This will start the script with the default settings, recording audio continuously and transcribing it into text using the default volume threshold and silence length. The script will:
+
 - Load settings from `~/.config/whisper-stream/config` if no arguments provided
 - Prompt for audio input device selection if none configured
 - Auto-generate daily transcription file in `$NOTEBOOK_ROOT/YYYY-Month/YYYY-MM-DD.md` format
@@ -192,6 +232,7 @@ Settings in this file are automatically loaded when running `whisper-stream` wit
 The application features a modular architecture with the following components:
 
 ### Core Modules (`lib/` directory)
+
 - **logging.sh**: Error logging and automatic log rotation
 - **gum_wrapper.sh**: Interactive UI framework with auto-installation
 - **config.sh**: Configuration management with persistent storage
@@ -200,7 +241,15 @@ The application features a modular architecture with the following components:
 - **transcription.sh**: API integration with retry logic and text processing
 - **ui.sh**: User interface display and formatted output
 
+### Supporting Directories
+
+- **docs/**: Documentation files including CLAUDE.md development guide and dictionary.md
+- **scripts/**: Installation and setup scripts for various environments
+- **packaging/**: Distribution packaging files (PKGBUILD, install scripts)
+- **dev/**: Development and build configuration files
+
 ### Key Design Patterns
+
 - **Separation of Concerns**: Each module has a single, well-defined responsibility
 - **Cross-Platform Compatibility**: OS-specific implementations for macOS and Linux
 - **Progressive Enhancement**: Graceful handling of optional dependencies
@@ -209,9 +258,10 @@ The application features a modular architecture with the following components:
 
 The main `whisper-stream` script acts as an orchestrator, sourcing all modules and coordinating the transcription workflow.
 
-## Author
+## Authors
 
 Yoichiro Hasebe [<yohasebe@gmail.com>]
+Robert Pannick [<rwpannick@gmail.com>]
 
 ## License
 

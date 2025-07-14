@@ -23,6 +23,7 @@ function display_help() {
     echo "  -q, --quiet                   Suppress the banner and settings"
     echo "  -ac, --autocorrect            Enable autocorrect"
     echo "  -dict, --dictionary <file>    Set the dictionary file for autocorrect"
+    echo "  --reset-config                Reset configuration and run first-time setup"
     echo "  -h, --help                    Display this help message"
     echo "To stop the app, press Ctrl+C"
     exit 0

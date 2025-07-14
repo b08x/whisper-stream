@@ -112,9 +112,12 @@ Key script parameters (lines 32-56):
   - `transcription.sh` - API integration and text processing
   - `ui.sh` - User interface display
 - `README.md` - User documentation with installation and usage examples
+- `docs/dictionary.md` - Autocorrect dictionary file
+- `docs/CLAUDE.md` - This file
+- `scripts/` - Installation and setup scripts
+- `packaging/` - Packaging files for distribution
+- `dev/` - Development and build files
 - `LICENSE` - MIT license
-- `dictionary.md` - Autocorrect dictionary file
-- `CLAUDE.md` - This file
 
 ## Development Notes
 

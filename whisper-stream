@@ -12,6 +12,7 @@ source "$LIB_DIR/ui.sh"
 source "$LIB_DIR/audio.sh"
 source "$LIB_DIR/transcription.sh"
 source "$LIB_DIR/arguments.sh"
+source "$SCRIPT_DIR/scripts/first_time_setup.sh"
 
 # --- Main Application ---
 
@@ -29,6 +30,19 @@ if ! command -v jq &>/dev/null; then
     exit 1
 fi
 gum_init # Initialize or install gum
+
+# Check for first-time setup
+if is_first_run; then
+    if run_first_time_setup; then
+        # User chose to continue to main app after setup
+        echo
+        gum_info "Continuing to whisper-stream..."
+        sleep 1
+    else
+        # Setup completed, user chose to exit
+        exit 0
+    fi
+fi
 
 # Load config from ~/.config/whisper-stream/config if it exists
 # Do this before parsing args so args can override config

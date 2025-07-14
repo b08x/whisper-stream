@@ -3,7 +3,7 @@
 # Function to correct and format transcribed text
 function correct_and_format_text() {
     local text="$1"
-    local dictionary_file="${DICTIONARY:-$HOME/.config/whisper-stream/dictionary.md}"
+    local dictionary_file="${DICTIONARY:-$SCRIPT_DIR/docs/dictionary.md}"
 
     if [ -f "$dictionary_file" ]; then
         echo "Applying corrections from: $dictionary_file" >&2

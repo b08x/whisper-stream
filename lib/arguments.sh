@@ -154,6 +154,10 @@ function parse_arguments() {
         -h | --help)
             display_help
             ;;
+        --reset-config)
+            reset_configuration
+            exit 0
+            ;;
         -df | --dest-file)
             if [[ ! $2 || $2 == -* ]]; then
                 echo "Error: Missing value for $1"
