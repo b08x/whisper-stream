@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default configuration and versioning
-VERSION="1.2.0"
+VERSION="1.0.0"
 AUTOCORRECT=false
 
 # Setting the default values for the script parameters
