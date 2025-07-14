@@ -46,7 +46,6 @@ package() {
     install -d "$pkgdir/usr/bin"
     install -d "$pkgdir/usr/share/$pkgname"
     install -d "$pkgdir/usr/share/$pkgname/lib"
-    install -d "$pkgdir/usr/share/$pkgname/scripts"
     install -d "$pkgdir/usr/share/doc/$pkgname"
     install -d "$pkgdir/usr/share/licenses/$pkgname"
     install -d "$pkgdir/etc/$pkgname"
@@ -58,13 +57,6 @@ package() {
     for lib_file in lib/*.sh; do
         if [[ -f "$lib_file" ]]; then
             install -m644 "$lib_file" "$pkgdir/usr/share/$pkgname/lib/"
-        fi
-    done
-    
-    # Install scripts directory
-    for script_file in scripts/*.sh; do
-        if [[ -f "$script_file" ]]; then
-            install -m644 "$script_file" "$pkgdir/usr/share/$pkgname/scripts/"
         fi
     done
     

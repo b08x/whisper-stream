@@ -1,4 +1,10 @@
-#!/bin/bash
+#! /usr/bin/env bash
+
+# Bashsmith template patterns for safety
+set -o nounset
+set -o errexit
+set -o pipefail
+IFS=$'\n\t'
 
 # Find the script's own directory
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -12,16 +18,7 @@ source "$LIB_DIR/ui.sh"
 source "$LIB_DIR/audio.sh"
 source "$LIB_DIR/transcription.sh"
 source "$LIB_DIR/arguments.sh"
-# Try to source first_time_setup.sh from multiple locations
-if [[ -f "$SCRIPT_DIR/scripts/first_time_setup.sh" ]]; then
-    source "$SCRIPT_DIR/scripts/first_time_setup.sh"
-elif [[ -f "/usr/share/whisper-stream/scripts/first_time_setup.sh" ]]; then
-    source "/usr/share/whisper-stream/scripts/first_time_setup.sh"
-else
-    # Define minimal first-time setup functions if file not found
-    is_first_run() { return 1; }
-    run_first_time_setup() { return 0; }
-fi
+source "$SCRIPT_DIR/scripts/first_time_setup.sh"
 
 # --- Main Application ---
 

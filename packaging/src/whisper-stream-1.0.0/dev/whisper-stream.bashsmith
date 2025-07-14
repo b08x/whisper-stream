@@ -1,0 +1,285 @@
+#! /usr/bin/env bash
+
+# DESCRIPTION
+# Whisper Stream Speech-to-Text Transcriber
+# Continuous speech-to-text transcription using the Groq API
+
+# Bashsmith template patterns for safety
+set -o nounset
+set -o errexit
+set -o pipefail
+IFS=$'\n\t'
+
+# CONSTANTS
+readonly SCRIPT_NAME="whisper-stream"
+readonly SCRIPT_VERSION="1.0.0"
+readonly SCRIPT_DIR="/usr/share/whisper-stream"
+readonly LIB_DIR="$SCRIPT_DIR/lib"
+
+# SETTINGS
+# Load configuration from multiple sources
+readonly SYSTEM_CONFIG="/etc/whisper-stream/config"
+readonly USER_CONFIG="$HOME/.config/whisper-stream/config"
+
+# Load system config if it exists
+if [[ -f "$SYSTEM_CONFIG" ]]; then
+    source "$SYSTEM_CONFIG"
+fi
+
+# Load user config if it exists (overrides system config)
+if [[ -f "$USER_CONFIG" ]]; then
+    source "$USER_CONFIG"
+fi
+
+# LIBRARY
+# Source all library files following bashsmith pattern
+source "$LIB_DIR/logging.sh"
+source "$LIB_DIR/gum_wrapper.sh"
+source "$LIB_DIR/config.sh"
+source "$LIB_DIR/ui.sh"
+source "$LIB_DIR/audio.sh"
+source "$LIB_DIR/transcription.sh"
+source "$LIB_DIR/arguments.sh"
+
+# FUNCTIONS
+# Main application logic
+main() {
+    # Initialize error logging
+    rotate_error_log
+    log_error "$SCRIPT_NAME started (PID: $$)"
+    
+    # Check essential dependencies
+    check_dependencies
+    
+    # Initialize gum
+    gum_init
+    
+    # Load configuration
+    load_config "$@"
+    
+    # Parse command-line arguments
+    parse_arguments "$@"
+    
+    # Display version if requested
+    if [[ "${SHOW_VERSION:-false}" == true ]]; then
+        printf "%s (version: %s)\n" "$SCRIPT_NAME" "$SCRIPT_VERSION"
+        exit 0
+    fi
+    
+    # Validate API token
+    validate_api_token
+    
+    # Set up signal handlers
+    trap handle_exit SIGINT SIGTSTP
+    
+    # Execute main application logic
+    if [[ -n "${AUDIO_FILE:-}" ]]; then
+        process_audio_file
+    else
+        start_continuous_recording
+    fi
+}
+
+# Dependency validation
+check_dependencies() {
+    local missing_deps=()
+    
+    for cmd in sox jq curl; do
+        if ! command -v "$cmd" &>/dev/null; then
+            missing_deps+=("$cmd")
+        fi
+    done
+    
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        printf "Error: Missing required dependencies: %s\n" "${missing_deps[*]}" >&2
+        printf "Please install them and try again.\n" >&2
+        exit 1
+    fi
+}
+
+# API token validation
+validate_api_token() {
+    if [[ -z "${TOKEN:-}" ]]; then
+        TOKEN="${GROQ_API_KEY:-}"
+    fi
+    
+    if [[ -z "$TOKEN" ]]; then
+        gum_fail "No Groq API key provided."
+        printf "Please provide it via:\n" >&2
+        printf "  - Environment variable: export GROQ_API_KEY='your-key'\n" >&2
+        printf "  - Config file: %s\n" "$USER_CONFIG" >&2
+        printf "  - Command line: -t 'your-key'\n" >&2
+        exit 1
+    fi
+}
+
+# Process single audio file
+process_audio_file() {
+    display_settings
+    gum_info "Processing audio file: $AUDIO_FILE"
+    convert_audio_to_text "$AUDIO_FILE"
+    handle_exit
+}
+
+# Start continuous recording mode
+start_continuous_recording() {
+    # Interactive setup for recording mode
+    setup_interactive_recording
+    
+    # Display current configuration
+    display_settings
+    
+    # Main recording loop
+    recording_loop
+}
+
+# Setup interactive recording parameters
+setup_interactive_recording() {
+    # Device selection
+    if [[ -z "${SELECTED_INPUT_DEVICE:-}" ]]; then
+        gum_info "No input device specified. Please select one:"
+        SELECTED_INPUT_DEVICE=$(select_input_device)
+        
+        if [[ -n "$SELECTED_INPUT_DEVICE" && "$SELECTED_INPUT_DEVICE" != "System Default" ]]; then
+            gum_info "Selected input device: $SELECTED_INPUT_DEVICE"
+            write_device_to_config "$SELECTED_INPUT_DEVICE"
+        fi
+    fi
+    
+    # Directory selection
+    setup_notebook_directory
+    
+    # Destination file selection
+    setup_destination_file
+}
+
+# Setup notebook directory
+setup_notebook_directory() {
+    local expanded_path="${NOTEBOOK_ROOT/#\$HOME/$HOME}"
+    
+    if [[ ! -d "$expanded_path" ]]; then
+        gum_warn "Notebook root not found. Please select a directory:"
+        local selected_dir
+        selected_dir=$(gum_file --directory --header "Select Notebook Root Directory" "$HOME")
+        
+        if [[ -n "$selected_dir" ]]; then
+            NOTEBOOK_ROOT="$selected_dir"
+            gum_info "Selected notebook root: $NOTEBOOK_ROOT"
+            write_notebook_root_to_config "$NOTEBOOK_ROOT"
+        else
+            gum_warn "No directory selected. Using default: $HOME/Notebooks"
+            NOTEBOOK_ROOT="$HOME/Notebooks"
+            mkdir -p "$NOTEBOOK_ROOT"
+        fi
+    fi
+}
+
+# Setup destination file
+setup_destination_file() {
+    if [[ -z "${DEST_FILE:-}" ]]; then
+        local dest_choice
+        dest_choice=$(gum_choose "Auto-generate daily file" "Select custom file" \
+                     --header "Choose destination for transcriptions")
+        
+        if [[ "$dest_choice" == "Select custom file" ]]; then
+            local custom_dest
+            gum_info "Select destination file (or navigate to create a new one):"
+            custom_dest=$(gum_file --header "Select Destination File" "${NOTEBOOK_ROOT/#\$HOME/$HOME}")
+            
+            if [[ -n "$custom_dest" ]]; then
+                DEST_FILE="$custom_dest"
+                gum_info "Selected destination file: $DEST_FILE"
+            else
+                DEST_FILE=$(generate_default_dest_file)
+                gum_warn "No file selected. Using auto-generated file: $DEST_FILE"
+            fi
+        else
+            DEST_FILE=$(generate_default_dest_file)
+            gum_info "Using auto-generated daily file: $DEST_FILE"
+        fi
+    fi
+}
+
+# Main recording loop
+recording_loop() {
+    local output_files=()
+    
+    while true; do
+        local output_file="/tmp/whisper-stream_output_$(date +%s).wav"
+        output_files+=("$output_file")
+        
+        # Record audio
+        record_audio_segment "$output_file"
+        
+        # Process if not silent
+        if [[ -s "$output_file" ]] && ! is_silent "$output_file"; then
+            convert_audio_to_text "$output_file" &
+            local pid=$!
+            spinner $pid
+        else
+            rm -f "$output_file"
+        fi
+        
+        # Exit if one-shot mode
+        if [[ "${ONESHOT:-false}" == true ]]; then
+            wait
+            break
+        fi
+    done
+    
+    # Clean up temporary files
+    for file in "${output_files[@]}"; do
+        rm -f "$file"
+    done
+}
+
+# Record audio segment
+record_audio_segment() {
+    local output_file="$1"
+    local rec_args=()
+    
+    # Configure recording arguments
+    if [[ -n "${SELECTED_INPUT_DEVICE:-}" && "$SELECTED_INPUT_DEVICE" != "System Default" ]]; then
+        rec_args=("-t" "pulseaudio" "$SELECTED_INPUT_DEVICE")
+    fi
+    
+    # Add common recording parameters
+    rec_args+=("-q" "-V0" "-e" "signed" "-L" "-c" "1" "-b" "16" "-r" "16000" "-t" "raw" "-")
+    
+    # Add silence detection
+    if [[ "${DURATION:-0}" -gt 0 ]]; then
+        rec_args+=("trim" "0" "$DURATION" "silence" "1" "0.1" "${MIN_VOLUME:-1%}" 
+                   "1" "${SILENCE_LENGTH:-1.5}" "${MIN_VOLUME:-1%}")
+    else
+        rec_args+=("silence" "1" "0.1" "${MIN_VOLUME:-1%}" 
+                   "1" "${SILENCE_LENGTH:-1.5}" "${MIN_VOLUME:-1%}")
+    fi
+    
+    # Record audio
+    rec "${rec_args[@]}" | sox -t raw -r 16000 -b 16 -e signed -c 1 - "$output_file"
+}
+
+# Clean exit handler
+handle_exit() {
+    log_error "$SCRIPT_NAME exiting (PID: $$)"
+    
+    # Wait for background jobs
+    wait
+    
+    # Kill child processes
+    pkill -P $$ >/dev/null 2>&1 || true
+    
+    # Clean up temporary files
+    rm -f /tmp/whisper-stream_output_*.wav
+    
+    printf "\r\e[K\n"
+    
+    if [[ -n "${DEST_FILE:-}" ]]; then
+        gum_info "Exiting. Transcription saved to $DEST_FILE"
+    fi
+    
+    exit 0
+}
+
+# EXECUTION
+main "$@"
