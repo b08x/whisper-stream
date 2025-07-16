@@ -34,14 +34,12 @@ COLOR_PURPLE=212
 COLOR_YELLOW=221
 COLOR_RED=9
 
-SCRIPT_TMP_DIR="$(mktemp -d "/tmp/.tmp.gum_XXXXX")"
-log "INFO" "Created temporary directory: ${SCRIPT_TMP_DIR}"
-
 # TEMP - Define SCRIPT_TMP_DIR if not already defined in the main script
-if [ -z "$SCRIPT_TMP_DIR" ]; then
+if [ -z "${SCRIPT_TMP_DIR:-}" ]; then
     SCRIPT_TMP_DIR="$(mktemp -d "/tmp/.tmp.gum_XXXXX")"
     ERROR_MSG="${SCRIPT_TMP_DIR}/gum_helpers.err"
     TRAP_CLEANUP_REQUIRED=true # Flag to indicate cleanup is needed at exit
+    log "INFO" "Created temporary directory: ${SCRIPT_TMP_DIR}"
 else
     TRAP_CLEANUP_REQUIRED=false
     ERROR_MSG="${SCRIPT_TMP_DIR}/gum_helpers.err"

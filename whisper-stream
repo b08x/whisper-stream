@@ -12,7 +12,16 @@ source "$LIB_DIR/ui.sh"
 source "$LIB_DIR/audio.sh"
 source "$LIB_DIR/transcription.sh"
 source "$LIB_DIR/arguments.sh"
-source "$SCRIPT_DIR/scripts/first_time_setup.sh"
+# Try to source first_time_setup.sh from multiple locations
+if [[ -f "$SCRIPT_DIR/scripts/first_time_setup.sh" ]]; then
+    source "$SCRIPT_DIR/scripts/first_time_setup.sh"
+elif [[ -f "/usr/share/whisper-stream/scripts/first_time_setup.sh" ]]; then
+    source "/usr/share/whisper-stream/scripts/first_time_setup.sh"
+else
+    # Define minimal first-time setup functions if file not found
+    is_first_run() { return 1; }
+    run_first_time_setup() { return 0; }
+fi
 
 # --- Main Application ---
 

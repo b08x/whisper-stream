@@ -35,3 +35,6 @@ tags
 *.txt
 *.mp3
 /logs/
+packaging/logs/**
+/packaging/pkg/
+/packaging/src/**

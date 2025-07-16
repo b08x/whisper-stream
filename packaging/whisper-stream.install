@@ -3,11 +3,7 @@
 # DESCRIPTION
 # Post-install script for whisper-stream package
 
-# Bashsmith template patterns for safety
-set -o nounset
-set -o errexit
-set -o pipefail
-IFS=$'\n\t'
+# Post-install script for whisper-stream
 
 # CONSTANTS
 readonly PACKAGE_NAME="whisper-stream"
@@ -49,10 +45,30 @@ post_upgrade() {
     printf "  %s/config.example\n" "$CONFIG_DIR"
 }
 
+# PRE-REMOVAL
+pre_remove() {
+    print_info "Removing whisper-stream..."
+    
+    # Stop any running whisper-stream processes
+    if pgrep -f "whisper-stream" >/dev/null; then
+        print_note "Stopping running whisper-stream processes..."
+        pkill -f "whisper-stream" || true
+    fi
+    
+    # Clean up temporary files
+    if [[ -d "/tmp" ]]; then
+        rm -f /tmp/whisper-stream-*.log 2>/dev/null || true
+        rm -rf /tmp/.tmp.gum_* 2>/dev/null || true
+    fi
+}
+
 # REMOVAL
 post_remove() {
     print_info "whisper-stream removed"
     
     print_note "User configuration preserved in:"
     printf "  %s/\n" "$USER_CONFIG_DIR"
+    
+    print_note "To completely remove all data, run:"
+    printf "  rm -rf %s\n" "$USER_CONFIG_DIR"
 }
