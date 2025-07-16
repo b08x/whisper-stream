@@ -1,7 +1,7 @@
 # Maintainer: b08x <b08x@users.noreply.github.com>
 pkgname=whisper-stream
 pkgver=1.0.0
-pkgrel=2
+pkgrel=5
 pkgdesc="Continuous speech-to-text transcription using Groq API with interactive UI"
 arch=('any')
 url="https://github.com/b08x/whisper-stream"
@@ -21,20 +21,20 @@ sha256sums=('SKIP')
 prepare() {
     cd "$pkgname-$pkgver"
     
-    # Apply bashsmith template patterns to the main script
-    # Add strict bash settings at the top of the script
-    sed -i '1a\\n# Bashsmith template patterns for safety\nset -o nounset\nset -o errexit\nset -o pipefail\nIFS=$'"'"'\\n\\t'"'"'' whisper-stream
-    
     # Update shebang to use env
     sed -i '1s|#!/bin/bash|#! /usr/bin/env bash|' whisper-stream
     
-    # Apply the same patterns to all lib files
+    # Update shebang for lib files
     for lib_file in lib/*.sh; do
         if [[ -f "$lib_file" ]]; then
-            # Update shebang
             sed -i '1s|#!/bin/bash|#! /usr/bin/env bash|' "$lib_file"
-            # Add strict settings after shebang
-            sed -i '1a\\n# Bashsmith template patterns for safety\nset -o nounset\nset -o errexit\nset -o pipefail\nIFS=$'"'"'\\n\\t'"'"'' "$lib_file"
+        fi
+    done
+    
+    # Update shebang for scripts files
+    for script_file in scripts/*.sh; do
+        if [[ -f "$script_file" ]]; then
+            sed -i '1s|#!/bin/bash|#! /usr/bin/env bash|' "$script_file"
         fi
     done
 }
@@ -64,7 +64,7 @@ package() {
     # Install scripts directory
     for script_file in scripts/*.sh; do
         if [[ -f "$script_file" ]]; then
-            install -m644 "$script_file" "$pkgdir/usr/share/$pkgname/scripts/"
+            install -m755 "$script_file" "$pkgdir/usr/share/$pkgname/scripts/"
         fi
     done
     
@@ -104,4 +104,31 @@ EOF
         "$pkgdir/usr/bin/whisper-stream"
     sed -i 's|LIB_DIR="$SCRIPT_DIR/lib"|LIB_DIR="/usr/share/whisper-stream/lib"|' \
         "$pkgdir/usr/bin/whisper-stream"
+    
+    # Fix the first_time_setup.sh sourcing paths
+    sed -i 's|if \[\[ -f "$SCRIPT_DIR/scripts/first_time_setup.sh" \]\]; then|if [[ -f "/usr/share/whisper-stream/scripts/first_time_setup.sh" ]]; then|' \
+        "$pkgdir/usr/bin/whisper-stream"
+    sed -i 's|source "$SCRIPT_DIR/scripts/first_time_setup.sh"|source "/usr/share/whisper-stream/scripts/first_time_setup.sh"|' \
+        "$pkgdir/usr/bin/whisper-stream"
+    
+    # Add gum_wrapper.sh sourcing to first_time_setup.sh
+    sed -i '1a\\n# Source gum_wrapper.sh for gum functions\nsource "/usr/share/whisper-stream/lib/gum_wrapper.sh"' \
+        "$pkgdir/usr/share/whisper-stream/scripts/first_time_setup.sh"
+    
+    # Remove the bashsmith strict settings that cause unbound variable errors
+    sed -i '/# Bashsmith template patterns for safety/,/IFS=.*$/d' "$pkgdir/usr/bin/whisper-stream"
+    
+    # Remove bashsmith patterns from lib files too
+    for lib_file in "$pkgdir/usr/share/$pkgname/lib"/*.sh; do
+        if [[ -f "$lib_file" ]]; then
+            sed -i '/# Bashsmith template patterns for safety/,/IFS=.*$/d' "$lib_file"
+        fi
+    done
+    
+    # Remove bashsmith patterns from scripts files
+    for script_file in "$pkgdir/usr/share/$pkgname/scripts"/*.sh; do
+        if [[ -f "$script_file" ]]; then
+            sed -i '/# Bashsmith template patterns for safety/,/IFS=.*$/d' "$script_file"
+        fi
+    done
 }
