@@ -1,5 +1,31 @@
 #!/bin/bash
 
+# Function to send success notification
+function send_success_notification() {
+    local transcription="$1"
+    local preview
+    
+    if command -v notify-send >/dev/null 2>&1; then
+        # Truncate transcription to first 50 characters for preview
+        if [ ${#transcription} -gt 50 ]; then
+            preview="${transcription:0:47}..."
+        else
+            preview="$transcription"
+        fi
+        
+        notify-send -i dialog-information -t 3000 "Transcription Complete" "$preview"
+    fi
+}
+
+# Function to send failure notification
+function send_failure_notification() {
+    local max_retries="$1"
+    
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send -i dialog-error -t 5000 "Transcription Failed" "Failed after $max_retries attempts. Check logs for details."
+    fi
+}
+
 # Function to correct and format transcribed text
 function correct_and_format_text() {
     local text="$1"
@@ -102,6 +128,9 @@ function convert_audio_to_text() {
                 transcription=$(correct_and_format_text "$transcription")
             fi
 
+            # Send success notification
+            send_success_notification "$transcription"
+
             printf "\r\e[K"
             xsel -cb
             xsel -a -b <<<"$transcription"
@@ -133,6 +162,10 @@ function convert_audio_to_text() {
 
     # If the loop finishes, all retries have failed.
     log_error "Transcription failed for $output_file after $max_retries attempts."
+    
+    # Send failure notification
+    send_failure_notification "$max_retries"
+    
     printf "\r\e[K\e[1;31mTranscription failed after %s attempts.\e[0m\n" "$max_retries"
     rm -f "$output_file"
     return 1
