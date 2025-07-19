@@ -224,6 +224,7 @@ gum_title() { gum join "$(gum_purple --bold "+ ")" "$(gum_purple --bold "${*}")"
 gum_info() { gum join "$(gum_green --bold "• ")" "$(gum_white "${*}")"; }
 gum_warn() { gum join "$(gum_yellow --bold "• ")" "$(gum_white "${*}")"; }
 gum_fail() { gum join "$(gum_red --bold "• ")" "$(gum_white "${*}")"; }
+gum_success() { gum join "$(gum_green --bold "• ")" "$(gum_purple "${*}")"; }
 
 # Gum wrapper
 gum_style() { gum style "${@}"; }

@@ -38,3 +38,5 @@ tags
 packaging/logs/**
 /packaging/pkg/
 /packaging/src/**
+*.tar.gz
+*.tar.zst
