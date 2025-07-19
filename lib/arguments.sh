@@ -1,5 +1,5 @@
 #!/bin/bash
-
+declare SHOW_VERSION=false
 # Parse command-line arguments to set script parameters
 function parse_arguments() {
     while [[ $# -gt 0 ]]; do

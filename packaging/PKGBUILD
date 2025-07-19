@@ -1,7 +1,7 @@
 # Maintainer: b08x <b08x@users.noreply.github.com>
 pkgname=whisper-stream
 pkgver=1.0.1
-pkgrel=6
+pkgrel=7
 pkgdesc="Continuous speech-to-text transcription using Groq API with interactive UI"
 arch=('any')
 url="https://github.com/b08x/whisper-stream"

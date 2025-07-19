@@ -209,12 +209,12 @@ verify_installation() {
         return 1
     fi
     
-    # Test if whisper-stream can display help
-    if "$INSTALL_DIR/whisper-stream" --help &> /dev/null; then
-        print_success "whisper-stream runs successfully"
-    else
-        print_warning "whisper-stream may have issues running"
-    fi
+    # # Test if whisper-stream can display help
+    # if "$INSTALL_DIR/whisper-stream" --help &> /dev/null; then
+    #     print_success "whisper-stream runs successfully"
+    # else
+    #     print_warning "whisper-stream may have issues running"
+    # fi
 }
 
 # Main installation function

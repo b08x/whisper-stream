@@ -59,12 +59,51 @@ pre_remove() {
     if [[ -d "/tmp" ]]; then
         rm -f /tmp/whisper-stream-*.log 2>/dev/null || true
         rm -rf /tmp/.tmp.gum_* 2>/dev/null || true
+        rm -f /tmp/whisper-stream-*.wav 2>/dev/null || true
+        rm -f /tmp/test_audio.* 2>/dev/null || true
+    fi
+    
+    # Clean up any auto-installed gum binary if it was installed by whisper-stream
+    if [[ -f "/usr/local/bin/gum" ]] && [[ -f "/tmp/.whisper-stream-gum-installed" ]]; then
+        print_note "Removing auto-installed gum binary..."
+        rm -f /usr/local/bin/gum 2>/dev/null || true
+        rm -f /tmp/.whisper-stream-gum-installed 2>/dev/null || true
+    fi
+    
+    # Clean up any cached downloads
+    if [[ -d "/tmp/whisper-stream-cache" ]]; then
+        rm -rf /tmp/whisper-stream-cache 2>/dev/null || true
     fi
 }
 
 # REMOVAL
 post_remove() {
     print_info "whisper-stream removed"
+    
+    # Final cleanup of any remaining temporary files
+    rm -f /tmp/whisper-stream-error.log 2>/dev/null || true
+    rm -f /tmp/.whisper-stream-* 2>/dev/null || true
+    
+    # Check if any files remain in expected locations and warn
+    local remaining_files=()
+    
+    if [[ -f "/usr/bin/whisper-stream" ]]; then
+        remaining_files+=("/usr/bin/whisper-stream")
+    fi
+    
+    if [[ -d "/usr/share/whisper-stream" ]]; then
+        remaining_files+=("/usr/share/whisper-stream/")
+    fi
+    
+    if [[ -d "/etc/whisper-stream" ]]; then
+        remaining_files+=("/etc/whisper-stream/")
+    fi
+    
+    if [[ ${#remaining_files[@]} -gt 0 ]]; then
+        print_note "Warning: Some files may not have been removed:"
+        printf "  %s\n" "${remaining_files[@]}"
+        print_note "You may need to remove them manually"
+    fi
     
     print_note "User configuration preserved in:"
     printf "  %s/\n" "$USER_CONFIG_DIR"
