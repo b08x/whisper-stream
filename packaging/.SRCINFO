@@ -1,7 +1,7 @@
 pkgbase = whisper-stream
 	pkgdesc = Continuous speech-to-text transcription using Groq API with interactive UI
 	pkgver = 2.0.0
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/b08x/whisper-stream
 	install = whisper-stream.install
 	arch = any
