@@ -1,8 +1,26 @@
 #!/bin/bash
 
+#TODO: implement a proper uninstall script that removes all files and directories created by this script
+
 # Find the script's own directory
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
-LIB_DIR="$SCRIPT_DIR/lib"
+
+# Determine installation root and set paths for lib and scripts
+if [ -d "$SCRIPT_DIR/lib" ]; then
+  # Manual/local install
+  INSTALL_ROOT="$SCRIPT_DIR"
+elif [ -d "/usr/share/whisper-stream/lib" ]; then
+  # Package manager install
+  INSTALL_ROOT="/usr/share/whisper-stream"
+else
+  echo "Error: Could not find the library directory." >&2
+  echo "Looked for '$SCRIPT_DIR/lib' and '/usr/share/whisper-stream/lib'." >&2
+  echo "Please ensure the script is run from its directory or installed correctly." >&2
+  exit 1
+fi
+
+LIB_DIR="$INSTALL_ROOT/lib"
+SCRIPTS_DIR="$INSTALL_ROOT/scripts"
 
 # Source all library files
 source "$LIB_DIR/logging.sh"
@@ -12,11 +30,9 @@ source "$LIB_DIR/ui.sh"
 source "$LIB_DIR/audio.sh"
 source "$LIB_DIR/transcription.sh"
 source "$LIB_DIR/arguments.sh"
-# Try to source first_time_setup.sh from multiple locations
-if [[ -f "$SCRIPT_DIR/scripts/first_time_setup.sh" ]]; then
-    source "$SCRIPT_DIR/scripts/first_time_setup.sh"
-elif [[ -f "/usr/share/whisper-stream/scripts/first_time_setup.sh" ]]; then
-    source "/usr/share/whisper-stream/scripts/first_time_setup.sh"
+# Try to source first_time_setup.sh
+if [[ -f "$SCRIPTS_DIR/first_time_setup.sh" ]]; then
+    source "$SCRIPTS_DIR/first_time_setup.sh"
 else
     # Define minimal first-time setup functions if file not found
     is_first_run() { return 1; }

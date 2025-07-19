@@ -1,5 +1,20 @@
 #! /usr/bin/env bash
 
+# Find the script's own directory to locate lib files
+_FTS_SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+
+# Source gum_wrapper.sh, searching in common locations
+if [ -f "$_FTS_SCRIPT_DIR/../lib/gum_wrapper.sh" ]; then
+  # shellcheck source=../lib/gum_wrapper.sh
+  source "$_FTS_SCRIPT_DIR/../lib/gum_wrapper.sh"
+elif [ -f "/usr/share/whisper-stream/lib/gum_wrapper.sh" ]; then
+  # shellcheck source=/usr/share/whisper-stream/lib/gum_wrapper.sh
+  source "/usr/share/whisper-stream/lib/gum_wrapper.sh"
+else
+  echo "Error: gum_wrapper.sh not found." >&2
+  exit 1
+fi
+
 # DESCRIPTION
 # First-time setup and configuration for whisper-stream
 

@@ -13,9 +13,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Installation paths
-INSTALL_DIR="/usr/local/bin"
-SHARE_DIR="/usr/local/share/whisper-stream"
-DOC_DIR="/usr/local/share/doc/whisper-stream"
+INSTALL_DIR="/usr/bin"
+SHARE_DIR="/usr/share/whisper-stream"
+DOC_DIR="/usr/share/doc/whisper-stream"
 
 # Function to print colored output
 print_info() {
@@ -137,10 +137,6 @@ install_whisper_stream() {
     cp docs/dictionary.md "$SHARE_DIR/" 2>/dev/null || true
     cp LICENSE "$DOC_DIR/" 2>/dev/null || true
     
-    # Fix the library path in the main script
-    sed -i 's|SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)|SCRIPT_DIR=/usr/local/share/whisper-stream|' \
-        "$INSTALL_DIR/whisper-stream"
-    
     print_success "whisper-stream installed successfully!"
 }
 
@@ -178,10 +174,10 @@ fi
 print_info "Removing whisper-stream..."
 
 # Remove files
-rm -f /usr/local/bin/whisper-stream
-rm -f /usr/local/bin/whisper-stream-uninstall
-rm -rf /usr/local/share/whisper-stream
-rm -rf /usr/local/share/doc/whisper-stream
+rm -f /usr/bin/whisper-stream
+rm -f /usr/bin/whisper-stream-uninstall
+rm -rf /usr/share/whisper-stream
+rm -rf /usr/share/doc/whisper-stream
 
 print_success "whisper-stream has been uninstalled successfully!"
 print_info "User configuration files in ~/.config/whisper-stream/ are preserved"

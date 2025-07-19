@@ -99,22 +99,6 @@ EOF
     # Install license
     install -m644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/"
     
-    # Fix the library path in the main script to use absolute paths
-    sed -i 's|SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)|SCRIPT_DIR=/usr/share/whisper-stream|' \
-        "$pkgdir/usr/bin/whisper-stream"
-    sed -i 's|LIB_DIR="$SCRIPT_DIR/lib"|LIB_DIR="/usr/share/whisper-stream/lib"|' \
-        "$pkgdir/usr/bin/whisper-stream"
-    
-    # Fix the first_time_setup.sh sourcing paths
-    sed -i 's|if \[\[ -f "$SCRIPT_DIR/scripts/first_time_setup.sh" \]\]; then|if [[ -f "/usr/share/whisper-stream/scripts/first_time_setup.sh" ]]; then|' \
-        "$pkgdir/usr/bin/whisper-stream"
-    sed -i 's|source "$SCRIPT_DIR/scripts/first_time_setup.sh"|source "/usr/share/whisper-stream/scripts/first_time_setup.sh"|' \
-        "$pkgdir/usr/bin/whisper-stream"
-    
-    # Add gum_wrapper.sh sourcing to first_time_setup.sh
-    sed -i '1a\\n# Source gum_wrapper.sh for gum functions\nsource "/usr/share/whisper-stream/lib/gum_wrapper.sh"' \
-        "$pkgdir/usr/share/whisper-stream/scripts/first_time_setup.sh"
-    
     # Remove the bashsmith strict settings that cause unbound variable errors
     sed -i '/# Bashsmith template patterns for safety/,/IFS=.*$/d' "$pkgdir/usr/bin/whisper-stream"
     
