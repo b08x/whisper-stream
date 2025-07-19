@@ -48,6 +48,48 @@ Since this is a bash script application:
 - **Development**: Edit modules in `lib/` directory, main logic in `whisper-stream`
 - **Debugging**: Check error logs at `/tmp/whisper-stream-error.log`
 
+## Testing Protocol
+
+When making changes:
+1. **Manual Testing**: Test core functionality with real audio input
+2. **Function Testing**: Test individual functions in isolation when possible
+3. **Verification Required**: Always ask the user to confirm tests passed rather than declaring success
+4. **Integration Testing**: Verify the complete workflow end-to-end
+
+## Deployment Process
+
+When changes are made to the codebase:
+
+### 1. Code Changes & Testing
+- Make modifications to appropriate module(s) in `lib/`
+- Test functionality manually with real inputs
+- Verify integration with existing features
+
+### 2. Version Control
+- Stage changes: `git add <modified-files>`
+- Commit with descriptive message following conventional commits format
+- Example: `feat: Add desktop notifications for transcription status`
+
+### 3. Package Version Update
+- Update `packaging/PKGBUILD` 
+- Increment `pkgrel` for patch changes (e.g., `pkgrel=5` → `pkgrel=6`)
+- For new features/breaking changes, increment `pkgver`
+
+### 4. Package Rebuild
+- Navigate to packaging directory: `cd packaging`
+- Rebuild package: `makepkg -f`
+- Verify new package created: `ls -la *.pkg.tar.zst`
+
+### 5. Release Process
+For features to be included in the distributed package:
+- Create new release tag: `git tag v1.0.2`
+- Push tag to remote: `git push origin v1.0.2` 
+- The PKGBUILD pulls from GitHub releases, so the tag triggers package update
+
+### 6. Distribution
+- Upload new package to AUR or distribution system
+- Update documentation if user-facing changes were made
+
 ## Common Usage Patterns
 
 The script operates in several modes:
