@@ -1,7 +1,7 @@
 pkgbase = whisper-stream
 	pkgdesc = Continuous speech-to-text transcription using Groq API with interactive UI
-	pkgver = 2.0.0
-	pkgrel = 2
+	pkgver = 2.1.0
+	pkgrel = 1
 	url = https://github.com/b08x/whisper-stream
 	install = whisper-stream.install
 	arch = any
@@ -10,15 +10,17 @@ pkgbase = whisper-stream
 	depends = curl
 	depends = jq
 	depends = sox
-	depends = xclip
 	depends = bash>=4.0
+	optdepends = wl-clipboard: for Wayland clipboard support (recommended)
+	optdepends = xclip: for X11 clipboard support (fallback)
+	optdepends = xsel: alternative X11 clipboard tool
 	optdepends = pulseaudio: for audio device selection on Linux
 	optdepends = alsa-utils: alternative audio system support
 	optdepends = gum: for enhanced interactive UI (auto-installed if not present)
 	provides = whisper-stream
 	conflicts = whisper-stream
 	backup = etc/whisper-stream/config.example
-	source = whisper-stream-2.0.0.tar.gz::https://github.com/b08x/whisper-stream/archive/v2.0.0.tar.gz
+	source = whisper-stream-2.1.0.tar.gz::https://github.com/b08x/whisper-stream/archive/v2.1.0.tar.gz
 	sha256sums = SKIP
 
 pkgname = whisper-stream
