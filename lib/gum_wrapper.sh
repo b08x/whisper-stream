@@ -25,7 +25,7 @@ fi
 
 # GUM
 GUM_VERSION="0.16.0"
-: "${GUM:=$HOME/.local/bin/gum}" # GUM=/usr/bin/gum ./your_script.sh
+GUM="${GUM:-$HOME/.local/bin/gum}" # GUM=/usr/bin/gum ./your_script.sh
 
 # COLORS
 COLOR_WHITE=251
@@ -49,7 +49,7 @@ fi
 # shellcheck disable=SC2317
 trap_error() {
     # If process calls this trap, write error to file to use in exit trap
-    local error_msg="Command '${BASH_COMMAND}' failed with exit code $? in function '${1}' (line ${2})"
+    local error_msg="Command '${BASH_COMMAND}' failed with exit code $? in function '${1:-unknown}' (line ${2:-unknown})"
     echo "$error_msg" >"$ERROR_MSG"
     log "ERROR" "$error_msg"
 }
@@ -59,7 +59,11 @@ trap_exit() {
     local result_code="$?"
 
     # Read error msg from file (written in error trap)
-    local error && [ -f "$ERROR_MSG" ] && error="$(<"$ERROR_MSG")" && rm -f "$ERROR_MSG"
+    local error=""
+    if [ -f "$ERROR_MSG" ]; then
+        error="$(<"$ERROR_MSG")"
+        rm -f "$ERROR_MSG"
+    fi
 
     # Cleanup temporary directory only if it was created in this script
     if [ "$TRAP_CLEANUP_REQUIRED" = "true" ]; then
