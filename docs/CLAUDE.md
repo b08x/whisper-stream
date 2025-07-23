@@ -32,7 +32,7 @@ Required system dependencies:
 - `curl` - API requests
 - `jq` - JSON processing  
 - `sox` - Audio recording and processing
-- `xclip` (Linux) or `pbcopy` (macOS) - Clipboard operations
+- `wl-clipboard` (Wayland), `xclip`/`xsel` (X11), or `pbcopy` (macOS) - Clipboard operations
 - `gum` - Interactive UI components (required, not optional)
 - `SwitchAudioSource` (macOS, optional) - Audio device switching
 - `pactl` or `arecord` (Linux) - Audio device detection
@@ -47,6 +47,9 @@ Since this is a bash script application:
 - **Execution**: `./whisper-stream` (ensure executable with `chmod +x`)
 - **Development**: Edit modules in `lib/` directory, main logic in `whisper-stream`
 - **Debugging**: Check error logs at `/tmp/whisper-stream-error.log`
+- **Building Package**: `cd packaging && makepkg -f` (builds Arch Linux package)
+- **Release Process**: `./scripts/release.sh` (automated version bumping and tagging)
+- **Update .SRCINFO**: `cd packaging && makepkg --printsrcinfo > .SRCINFO`
 
 ## Testing Protocol
 
@@ -78,13 +81,22 @@ When changes are made to the codebase:
 ### 4. Package Rebuild
 - Navigate to packaging directory: `cd packaging`
 - Rebuild package: `makepkg -f`
+- Update .SRCINFO: `makepkg --printsrcinfo > .SRCINFO`
 - Verify new package created: `ls -la *.pkg.tar.zst`
 
-### 5. Release Process
-For features to be included in the distributed package:
-- Create new release tag: `git tag v1.0.2`
-- Push tag to remote: `git push origin v1.0.2` 
-- The PKGBUILD pulls from GitHub releases, so the tag triggers package update
+### 5. Automated Release Process
+Use the automated release script for version management:
+- Run: `./scripts/release.sh`
+- Choose release type: patch/minor/major/release/custom
+- Script automatically:
+  - Updates PKGBUILD version numbers
+  - Updates .SRCINFO file
+  - Creates git commit and tag (for new versions)
+  - Pushes to remote repository
+- For manual releases:
+  - Create new release tag: `git tag v1.0.2`
+  - Push tag to remote: `git push origin v1.0.2`
+  - The PKGBUILD pulls from GitHub releases, so the tag triggers package update
 
 ### 6. Distribution
 - Upload new package to AUR or distribution system
@@ -111,7 +123,7 @@ Key script parameters (lines 32-56):
 ## Critical Implementation Details
 
 - **Audio Processing Pipeline**: SoX recording → silence detection → Groq API → clipboard/file output
-- **Cross-platform Compatibility**: OS detection via `uname` for device handling and clipboard operations
+- **Cross-platform Compatibility**: OS detection via `uname` for device handling and clipboard operations with Wayland/X11/macOS support
 - **Error Handling**: 3-attempt retry logic for API calls (transcription.sh:convert_audio_to_text)
 - **Silence Detection**: Uses SoX stats to check maximum amplitude against threshold (audio.sh:is_silent)
 - **Device Selection**: Interactive PulseAudio device selection with fallback to system default

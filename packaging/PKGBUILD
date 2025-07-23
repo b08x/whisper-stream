@@ -6,8 +6,11 @@ pkgdesc="Continuous speech-to-text transcription using Groq API with interactive
 arch=('any')
 url="https://github.com/b08x/whisper-stream"
 license=('MIT')
-depends=('curl' 'jq' 'sox' 'xclip' 'bash>=4.0')
-optdepends=('pulseaudio: for audio device selection on Linux'
+depends=('curl' 'jq' 'sox' 'bash>=4.0')
+optdepends=('wl-clipboard: for Wayland clipboard support (recommended)'
+            'xclip: for X11 clipboard support (fallback)'
+            'xsel: alternative X11 clipboard tool'
+            'pulseaudio: for audio device selection on Linux'
             'alsa-utils: alternative audio system support'
             'gum: for enhanced interactive UI (auto-installed if not present)')
 makedepends=('git')

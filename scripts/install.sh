@@ -68,27 +68,27 @@ install_dependencies() {
     
     case $pm in
         "pacman")
-            pacman -Sy --noconfirm curl jq sox xclip
+            pacman -Sy --noconfirm curl jq sox wl-clipboard
             ;;
         "apt")
             apt update
-            apt install -y curl jq sox xclip
+            apt install -y curl jq sox wl-clipboard
             ;;
         "dnf")
-            dnf install -y curl jq sox xclip
+            dnf install -y curl jq sox wl-clipboard
             ;;
         "yum")
-            yum install -y curl jq sox xclip
+            yum install -y curl jq sox wl-clipboard
             ;;
         "zypper")
-            zypper install -y curl jq sox xclip
+            zypper install -y curl jq sox wl-clipboard
             ;;
         "unknown")
             print_warning "Unknown package manager. Please install the following packages manually:"
             print_warning "  - curl"
             print_warning "  - jq"
             print_warning "  - sox"
-            print_warning "  - xclip"
+            print_warning "  - wl-clipboard (Wayland) or xclip/xsel (X11)"
             read -p "Continue installation? (y/N): " -n 1 -r
             echo
             if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -105,7 +105,10 @@ check_dependencies() {
     command -v curl &> /dev/null || missing+=("curl")
     command -v jq &> /dev/null || missing+=("jq")
     command -v sox &> /dev/null || missing+=("sox")
-    command -v xclip &> /dev/null || missing+=("xclip")
+    # Check for clipboard tools (prefer Wayland, fallback to X11)
+    if ! (command -v wl-copy &> /dev/null || command -v xclip &> /dev/null || command -v xsel &> /dev/null); then
+        missing+=("clipboard-tool")
+    fi
     
     if [[ ${#missing[@]} -gt 0 ]]; then
         print_error "Missing dependencies: ${missing[*]}"

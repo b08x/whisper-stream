@@ -61,7 +61,7 @@ This script will:
 - `curl`
 - `jq`
 - `sox`
-- `xclip` (for Linux) or `pbcopy` (for macOS)
+- `wl-clipboard` (for Wayland), `xclip` or `xsel` (for X11), or `pbcopy` (for macOS)
 - `pactl` or `arecord` (for Linux audio device detection)
 - `SwitchAudioSource` (optional for macOS)
 
@@ -70,7 +70,7 @@ This script will:
 On a Debian-based Linux distribution, you can install these dependencies with:
 
 ```bash
-sudo apt-get install curl jq sox xclip alsa-utils
+sudo apt-get install curl jq sox wl-clipboard alsa-utils
 ```
 
 2. Identify a directory in your system's PATH variable where you want to place the script. You can check the directories in your PATH variable by running the following command:

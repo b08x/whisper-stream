@@ -1,5 +1,44 @@
 #!/bin/bash
 
+# Function to copy text to clipboard with cross-platform and display server support
+function copy_to_clipboard() {
+    local text="$1"
+    
+    # Clear any existing clipboard contents first
+    case "$(uname)" in
+        Darwin)
+            # macOS
+            if command -v pbcopy >/dev/null 2>&1; then
+                echo "$text" | pbcopy
+                return 0
+            fi
+            ;;
+        Linux)
+            # Check for Wayland session first
+            if [[ -n "$WAYLAND_DISPLAY" ]] || [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
+                if command -v wl-copy >/dev/null 2>&1; then
+                    echo "$text" | wl-copy
+                    return 0
+                fi
+            fi
+            
+            # Fallback to X11 tools
+            if command -v xsel >/dev/null 2>&1; then
+                xsel -cb  # Clear clipboard
+                echo "$text" | xsel -ib  # Copy to clipboard
+                return 0
+            elif command -v xclip >/dev/null 2>&1; then
+                echo "$text" | xclip -selection clipboard
+                return 0
+            fi
+            ;;
+    esac
+    
+    # If we get here, no clipboard tool was found
+    log_error "Warning: No clipboard tool found. Text not copied to clipboard."
+    return 1
+}
+
 # Function to send success notification
 function send_success_notification() {
     local transcription="$1"
@@ -132,8 +171,7 @@ function convert_audio_to_text() {
             send_success_notification "$transcription"
 
             printf "\r\e[K"
-            xsel -cb
-            xsel -a -b <<<"$transcription"
+            copy_to_clipboard "$transcription"
 
             if [ -n "$DEST_FILE" ]; then
                 echo "$transcription" | tee -a "$DEST_FILE"
