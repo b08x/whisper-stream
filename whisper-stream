@@ -95,6 +95,9 @@ output_files=() # Array to store the names of output audio files
 
 # Handle the script termination: clean up and save transcriptions
 function handle_exit() {
+    # Set flag to indicate this is a clean shutdown
+    export WHISPER_STREAM_CLEAN_EXIT=true
+    
     log_error "whisper-stream exiting (PID: $$)"
 
     # Wait for any currently running background jobs to finish

@@ -78,6 +78,13 @@ trap_exit() {
         exit 1
     fi
 
+    # Check if this is a clean whisper-stream exit
+    if [ "${WHISPER_STREAM_CLEAN_EXIT:-false}" = "true" ]; then
+        log "INFO" "whisper-stream exited cleanly"
+        # Don't show success message for whisper-stream clean exits
+        exit 0
+    fi
+
     # Check if failed and print error
     if [ "$result_code" -gt "0" ]; then
         if [ -n "$error" ]; then
