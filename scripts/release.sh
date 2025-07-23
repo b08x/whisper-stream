@@ -3,7 +3,7 @@
 # DESCRIPTION
 # Automates the release process for whisper-stream.
 # - Checks for a clean git state.
-# - Bumps version in PKGBUILD.
+# - Bumps version in PKGBUILD and RPM spec file.
 # - Updates .SRCINFO.
 # - Commits and tags the new release.
 # - Pushes to the remote repository.
@@ -39,14 +39,31 @@ echo "Found 'makepkg'."
 # --- Version Bumping ---
 
 PKGBUILD_PATH="packaging/PKGBUILD"
+SPEC_PATH="packaging/whisper-stream.spec"
 
 # Get current version from PKGBUILD
 current_pkgver=$(grep -oP 'pkgver=\K.*' "$PKGBUILD_PATH")
 current_pkgrel=$(grep -oP 'pkgrel=\K.*' "$PKGBUILD_PATH")
 
+# Get current version from spec file for verification
+spec_version=$(grep -oP 'Version:\s*\K.*' "$SPEC_PATH")
+spec_release=$(grep -oP 'Release:\s*\K[0-9]+' "$SPEC_PATH")
+
 echo
-echo "Current version: $current_pkgver"
-echo "Current release: $current_pkgrel"
+echo "Current PKGBUILD version: $current_pkgver-$current_pkgrel"
+echo "Current spec file version: $spec_version-$spec_release"
+
+# Verify versions are in sync
+if [[ "$current_pkgver" != "$spec_version" ]] || [[ "$current_pkgrel" != "$spec_release" ]]; then
+    echo "Warning: PKGBUILD and spec file versions are not in sync!"
+    echo "PKGBUILD: $current_pkgver-$current_pkgrel"
+    echo "Spec file: $spec_version-$spec_release"
+    read -r -p "Continue anyway? [y/N] " sync_confirmation
+    if [[ ! "$sync_confirmation" =~ ^[yY](es)?$ ]]; then
+        echo "Release cancelled. Please sync versions manually first."
+        exit 1
+    fi
+fi
 echo
 
 # Ask user for the type of version bump
@@ -124,6 +141,11 @@ sed -i "s/pkgver=.*/pkgver=$new_pkgver/" "$PKGBUILD_PATH"
 sed -i "s/pkgrel=.*/pkgrel=$new_pkgrel/" "$PKGBUILD_PATH"
 echo "PKGBUILD updated."
 
+echo "Updating RPM spec file..."
+sed -i "s/Version:.*/Version:        $new_pkgver/" "$SPEC_PATH"
+sed -i "s/Release:.*/Release:        $new_pkgrel%{?dist}/" "$SPEC_PATH"
+echo "RPM spec file updated."
+
 echo "Updating .SRCINFO..."
 (
     cd packaging
@@ -137,7 +159,7 @@ commit_message="chore(release): v$new_pkgver-$new_pkgrel"
 git_tag="v$new_pkgver"
 
 echo "Committing changes..."
-git add packaging/PKGBUILD packaging/.SRCINFO
+git add packaging/PKGBUILD packaging/.SRCINFO packaging/whisper-stream.spec
 git commit -m "$commit_message"
 echo "Committed with message: $commit_message"
 

@@ -2,8 +2,8 @@
 # Fedora 42 package specification
 
 Name:           whisper-stream
-Version:        2.0.0
-Release:        2%{?dist}
+Version:        2.1.0
+Release:        1%{?dist}
 Summary:        Continuous speech-to-text transcription using Groq API with interactive UI
 
 License:        MIT
